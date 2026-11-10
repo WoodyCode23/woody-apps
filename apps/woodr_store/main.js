@@ -19,7 +19,7 @@ const { UpdaterClient } = require('./updater_client');
 const M = require('./model');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '0.1.1';
+const APP_ID = 'woodr_store', VERSION = '0.2.0';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
@@ -45,7 +45,8 @@ mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
         let state = null, live = false, demo = false, note = '', noteAt = 0;
-        let sel = 1, scrollY = 0, armed = null, armedAt = 0;
+        let sel = 0, scrollY = 0, armed = null, armedAt = 0;
+        let open = null;                   /* the developer folder shown, or null for the folder list */
         const t0 = Date.now();
 
         const client = new UpdaterClient({ hello: { id: APP_ID, version: VERSION } });
@@ -67,13 +68,26 @@ mgu.run({
             if (!state && !live && Date.now() - t0 > 3000) { demo = true; return M.DEMO; }
             return state;
         };
-        const listRows = () => { const s = current(); return s ? M.rows(M.group(s)) : []; };
-        const selected = () => { const r = listRows()[sel]; return r && r.item ? r.item : null; };
+        const listRows = () => { const s = current(); return s ? M.rows(M.group(s), open) : []; };
+        const selectedRow = () => listRows()[sel] || null;
+        const selected = () => { const r = selectedRow(); return r && r.item ? r.item : null; };
+
+        /* into a folder, or back out to the list of folders (the cursor lands on the folder left) */
+        function enter(row) {
+            if (!row) return;
+            if (row.folder) { open = row.folder.dev; sel = row.folder.items.length ? 1 : 0; scrollY = 0; armed = null; return; }
+            if (row.back) {
+                const left = open;
+                open = null; scrollY = 0; armed = null;
+                const r = listRows();
+                sel = Math.max(0, r.findIndex((x) => x.folder && x.folder.dev === left));
+            }
+        }
 
         function move(d) {
             const r = listRows(); if (!r.length) return;
             let i = sel;
-            for (let n = 0; n < r.length; n++) { i = (i + d + r.length) % r.length; if (r[i].item) break; }
+            i = (i + d + r.length) % r.length;
             sel = i; armed = null;
         }
 
@@ -89,10 +103,11 @@ mgu.run({
 
         function drawList(cv, t) {
             const p = { x: 24, y: 44, w: 860, h: 468 };
-            G.panel(cv, t, p.x, p.y, p.w, p.h, 'Apps');
+            G.panel(cv, t, p.x, p.y, p.w, p.h, open ? (open === 'Woody' ? 'My apps' : open) : 'Developers');
             const r = listRows();
             if (!r.length) { cv.text(live ? 'The updater lists nothing yet' : 'Connecting to the updater...', 48, 130, 24, t.dim); return; }
-            if (sel >= r.length || !r[sel].item) move(1);
+            if (open && !r[0].back) open = null;          /* the folder went away (its source removed) */
+            if (sel >= r.length) sel = r.length - 1;
             const top = p.y + 52, bottom = p.y + p.h - 10, viewH = bottom - top;
             /* where each row sits, and keep the cursor in view */
             let y = 0; const ys = r.map((row) => { const at = y; y += row.header ? HEAD : ROW; return at; });
@@ -104,11 +119,18 @@ mgu.run({
             r.forEach((row, i) => {
                 const ry = top + ys[i] - scrollY;
                 if (ry > bottom || ry + ROW < top) return;
-                if (row.header) {
-                    const g = row.header;
-                    cv.text((g.mine ? 'MY APPS  ' : '') + g.dev, 48, ry + 30, 24, g.mine ? AMBER : t.text, { font: 'bold' });
-                    const tags = [g.queued ? g.queued + ' queued' : '', g.updates ? g.updates + (g.updates > 1 ? ' updates' : ' update') : ''].filter((x) => x);
-                    if (tags.length) cv.text(tags.join('  ·  '), p.x + p.w - 24, ry + 30, 20, AMBER, { align: 'right' });
+                if (row.folder || row.back) {
+                    const g = row.folder || row.back, on = i === sel;
+                    if (on) cv.roundRect(40, ry + 2, p.w - 32, ROW - 6, 10, withAlpha(t.accent, 0.18));
+                    if (row.back) {
+                        cv.text('<  All developers', 60, ry + 36, 24, t.text, { font: on ? 'bold' : undefined });
+                    } else {
+                        cv.text(g.mine ? 'Woody  (my apps)' : g.dev, 60, ry + 26, 24, g.mine ? AMBER : t.text, { font: 'bold' });
+                        cv.text(g.items.length + (g.items.length === 1 ? ' app' : ' apps') + '  ·  ' + g.installed + ' installed', 60, ry + 48, 18, t.dim);
+                        const tags = [g.queued ? g.queued + ' queued' : '', g.updates ? g.updates + (g.updates > 1 ? ' updates' : ' update') : ''].filter((x) => x);
+                        cv.text(tags.length ? tags.join('  ·  ') : 'Open  >', p.x + p.w - 30, ry + 36, 20, tags.length ? AMBER : t.dim, { font: 'bold', align: 'right' });
+                    }
+                    if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; enter(row); return render(); }, 'f' + i + (open || ''), 10);
                     return;
                 }
                 const c = row.item, on = i === sel;
@@ -128,6 +150,22 @@ mgu.run({
             const s = current();
             G.panel(cv, t, p.x, p.y, p.w, p.h, demo ? 'Details  (PREVIEW - sample data)' : 'Details');
             const c = selected();
+            const row = selectedRow();
+            if (!c && row && (row.folder || row.back)) {
+                /* a folder: who it is and where its apps come from */
+                const g = row.folder || row.back;
+                let fy = p.y + 92;
+                cv.text(g.mine ? 'Woody (my apps)' : g.dev, p.x + 24, fy, 32, g.mine ? AMBER : t.text, { font: 'bold' }); fy += 40;
+                cv.text(g.items.length + ' apps, ' + g.installed + ' installed' + (g.updates ? ', ' + g.updates + ' to update' : ''), p.x + 24, fy, 20, t.text); fy += 40;
+                cv.text('Sources', p.x + 24, fy, 20, t.dim); fy += 30;
+                g.sources.forEach((src) => {
+                    cv.text(src.label || src.id, p.x + 24, fy, 20, t.text);
+                    cv.text((src.channel || '') + '  ·  ' + (src.status || ''), p.x + p.w - 24, fy, 18, src.status === 'ok' ? GREEN : AMBER, { align: 'right' });
+                    fy += 28;
+                });
+                cv.text(row.back ? 'Press to go back to all developers' : 'Press to open', p.x + 24, p.y + p.h - 40, 20, t.dim);
+                return;
+            }
             if (!c) {
                 cv.text(live ? 'Pick an app' : 'Waiting for mgu-updater...', p.x + 24, p.y + 90, 24, t.dim);
                 return;
@@ -178,7 +216,7 @@ mgu.run({
         }
 
         ctx.onScroll((dy) => { const before = sel; move(dy > 0 ? 1 : -1); render().catch(() => {}); return before !== sel; });
-        ui.onClick('BTN_ACTION', () => { act(selected()); return render(); });
+        ui.onClick('BTN_ACTION', () => { const row = selectedRow(); if (row && (row.folder || row.back)) enter(row); else act(selected()); return render(); });
         ui.onClick('BTN_PAGE', () => { move(1); return render(); });
         ui.onClick('BTN_PREV', () => { move(-1); return render(); });
         ui.onClick('BTN_CHECK', () => { if (!demo) client.check(); note = 'Checking every source...'; noteAt = Date.now(); return render(); });

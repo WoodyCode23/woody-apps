@@ -4,6 +4,7 @@
  * yours first, with what each one needs and what it is doing.
  */
 const MINE = 'woody-apps';
+const MY_OWNER = 'WoodyCode23';          /* every repo of this owner (the new one and the old fork) is "Woody" */
 
 /** the developer a source belongs to: its owner on GitHub, else its label */
 function developerOf(src) {
@@ -35,8 +36,10 @@ function group(state) {
     const groups = {};
     (state.components || []).forEach((c) => {
         const src = sources[c.source];
-        const dev = c.source === MINE ? 'Woody' : developerOf(src);
-        const g = groups[dev] || (groups[dev] = { dev: dev, mine: c.source === MINE, items: [] });
+        const mine = c.source === MINE || developerOf(src) === MY_OWNER;
+        const dev = mine ? 'Woody' : developerOf(src);
+        const g = groups[dev] || (groups[dev] = { dev: dev, mine: mine, items: [], sources: [] });
+        if (src && g.sources.indexOf(src) < 0) g.sources.push(src);
         /* busy names the id it installs under, which is the row's installAs when two sources share an id */
         const busy = state.busy && (state.busy.id === c.id || state.busy.id === c.installAs) ? state.busy : null;
         /* a press counts as queued until the updater says so itself, or for 20 s at most */
@@ -51,16 +54,21 @@ function group(state) {
         g.items.sort((a, b) => rank(a) - rank(b) || String(a.title || a.id).localeCompare(String(b.title || b.id)));
         g.updates = g.items.filter((c) => c.status === 'update').length;
         g.queued = g.items.filter((c) => c.busy || c.queued || c.sent).length;
+        g.installed = g.items.filter((c) => c.installed).length;
     });
     list.sort((a, b) => (b.mine - a.mine) || a.dev.localeCompare(b.dev));
     return list;
 }
 
-/** the flat order the cursor walks: [{ header }, { item }, ...] */
-function rows(groups) {
-    const out = [];
-    groups.forEach((g) => { out.push({ header: g }); g.items.forEach((c) => out.push({ item: c, dev: g.dev })); });
-    return out;
+/**
+ * The rows the cursor walks. Folders: one row per developer. A folder open: a way back, then its apps.
+ *   open = null        -> [{ folder: g }, ...]
+ *   open = 'Woody'     -> [{ back: g }, { item, dev }, ...]
+ */
+function rows(groups, open) {
+    const g = open ? groups.filter((x) => x.dev === open)[0] : null;
+    if (!g) return groups.map((x) => ({ folder: x }));
+    return [{ back: g }].concat(g.items.map((c) => ({ item: c, dev: g.dev })));
 }
 
 /* a believable state for the desktop preview, where there is no updater */
