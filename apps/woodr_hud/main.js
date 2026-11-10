@@ -32,7 +32,8 @@ const SLOT = { x: 220, y: 185, w: 470, h: 133 };            /* clear of BMW's HU
 const MENU = { x: 260, y: 150, w: 390, h: 190 };
 const COLOURS = { green: '#2fd27a', yellow: '#ffd34d', red: '#ff2a2a' };
 const FRAME = 7, PAD = 6;
-const SIZES = [['small', 40], ['medium', 0], ['large', 75]];
+/* widths that stay inside the HUD's visible 570 px (Screen Lab): 280 / 400 / 544 px */
+const SIZES = [['small', 35], ['medium', 50], ['large', 68]];
 
 function drawMenu(cv, items, at) {
     const rowH = Math.floor((MENU.h - 16) / items.length);
@@ -68,11 +69,13 @@ async function background(bg) {
     const items = () => [
         { key: 'warmup', label: 'Warm-Up: ' + (st.warmup === 'hide' ? 'show again' : 'hide this drive') },
         { key: 'shift', label: 'Shift lights: ' + (st.shiftOn ? 'off' : 'on') },
-        { key: 'waze', label: 'Waze map size: ' + (SIZES[(sizeAt() + 1) % SIZES.length][0]) },
+        { key: 'waze', label: 'Waze map: ' + SIZES[sizeAt()][0] + '  >  ' + SIZES[(sizeAt() + 1) % SIZES.length][0] },
+        { key: 'test', label: 'Test shift lights' },
         { key: 'ambient', label: 'Ambient: next colour' },
         { key: 'close', label: 'Close' },
     ];
     let sizeIx = 1;
+    const syncSize = () => { const pct = waze.st && waze.st.hud_width_pct; const i = SIZES.findIndex((z) => z[1] === pct); if (i >= 0) sizeIx = i; };
     const sizeAt = () => sizeIx;
 
     function showMenu() {
@@ -94,6 +97,7 @@ async function background(bg) {
         if (key === 'warmup') { st.warmup = st.warmup === 'hide' ? 'show' : 'hide'; shared.write('hud.json', { warmup: st.warmup }); }
         else if (key === 'shift') { st.shiftOn = !st.shiftOn; settings.set('shift', st.shiftOn); }
         else if (key === 'waze') { sizeIx = (sizeIx + 1) % SIZES.length; waze.setSize(SIZES[sizeIx][1]).catch(() => {}); }
+        else if (key === 'test') { st.testUntil = Date.now() + 6500; }
         else if (key === 'ambient') { const a = shared.read('ambient.json') || {}; shared.write('ambient.json', { cmd: 'next', n: (a.n || 0) + 1 }); }
     }
 
@@ -149,7 +153,11 @@ async function background(bg) {
             if (!cr) return;
             const d = car.data ? car.data() : car.live;
             const rpm = d && typeof d.rpm === 'number' ? d.rpm : null;
-            const stage = st.shiftOn && rpm !== null && rpm > 400 ? stageOf(rpm) : '';
+            /* the test: green, yellow, red, flash, 1.5 s each, engine or not */
+            const testLeft = (st.testUntil || 0) - Date.now();
+            const stage = testLeft > 0 ? ['flash', 'red', 'yellow', 'green', 'green'][Math.floor(testLeft / 1500)] || 'green'
+                : st.shiftOn && rpm !== null && rpm > 400 ? stageOf(rpm) : '';
+            if (stage !== st.stage) log.info('shift: ' + (stage || 'off') + (rpm !== null ? ' at ' + Math.round(rpm) + ' rpm' : '') + (testLeft > 0 ? ' (test)' : ''));
             st.stage = stage;
             if (!stage) { hideFrame(); return; }
             placeFrame(st.box, COLOURS[stage === 'flash' ? 'red' : stage]);
@@ -158,7 +166,7 @@ async function background(bg) {
         } catch (e) { log.warn('shift: ' + e); }
     }, 120);
 
-    const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {}); }, 4000);
+    const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 4000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
     process.on('exit', () => { [menuTimer, shiftTimer, wazeTimer].forEach(clearInterval); taps.stop(); closeMenu(); hideFrame(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
