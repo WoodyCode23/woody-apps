@@ -10,7 +10,7 @@ const G = require('./kit/gauges');
 const Car = require('./kit/car');
 const { WarmHud, state, revCeiling } = require('./hud');
 const GearboxTemp = require('./gearbox');
-const { Tyres } = require('./tyres');
+const { Tyres, shownUnits, presText } = require('./tyres');
 
 const W = 1600, H = 520;
 const APP_ID = 'woodr_warmhud';
@@ -41,7 +41,7 @@ async function background(bg) {
             const want = wantGearbox();
             if (want && !polling) { gearbox.start(); polling = true; bg.log.info('gearbox: polling (engine running)'); }
             else if (!want && polling) { gearbox.stop(); polling = false; bg.log.info('gearbox: stopped'); }
-            hud.update(Object.assign({}, car.live, { trans: gearbox.value(), tyres: tyres.snapshot(), engineOn: rpmSeen > 0 && Date.now() - rpmSeen < ENGINE_HOLD_MS }));
+            hud.update(Object.assign({}, car.live, { trans: gearbox.value(), tyres: tyres.snapshot(), units: tyres.units, engineOn: rpmSeen > 0 && Date.now() - rpmSeen < ENGINE_HOLD_MS }));
         } catch (e) { bg.log.warn('hud tick: ' + e); }
     };
     const timer = setInterval(tick, 1000);
@@ -64,7 +64,7 @@ mgu.run({
 
         const num = (v) => (typeof v === 'number' && isFinite(v));
         const readyAt = () => Number(settings.get('readyAt')) || 90;
-        const unitF = () => settings.get('tempUnit') === 'f';
+        const unitF = () => shownUnits(settings, tyres.units).temp === 'f';
         const shown = (c) => (!num(c) ? '--' : Math.round(unitF() ? c * 9 / 5 + 32 : c) + String.fromCharCode(176) + (unitF() ? 'F' : 'C'));
 
 
@@ -84,8 +84,8 @@ mgu.run({
             cv.text('Tyres', 420, 270, 26, t.dim);
             cv.text(num(ty.minT) ? shown(ty.minT) + ' ' + corner(ty.minCorner) : '--', 520, 270, 30, num(ty.minT) ? t.text : t.dim, { font: 'bold' });
             if (ty.lowest && num(ty.lowest.p)) {
-                const psi = settings.get('pressureUnit') !== 'bar';
-                const f = (b) => (psi ? Math.round(b * 14.5038) + ' psi' : b.toFixed(1) + ' bar');
+                const pu = shownUnits(settings, tyres.units).press;
+                const f = (b) => presText(b, pu);
                 cv.text('low ' + corner(ty.lowest.corner) + ' ' + f(ty.lowest.p) + ' / ' + f(ty.lowest.target), 420, 320, 22, t.dim);
             }
             cv.text('Gearbox', 48, 320, 26, t.dim);

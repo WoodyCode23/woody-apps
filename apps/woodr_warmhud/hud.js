@@ -53,7 +53,8 @@ function revCeiling(oil, readyAt) {
 const CORNER = { FLH: 'FL', FRH: 'FR', RLH: 'RL', RRH: 'RR' };
 
 /** tyre pressure in the chosen unit */
-function pres(bar, unit) { return !num(bar) ? '--' : unit === 'bar' ? bar.toFixed(1) + ' bar' : Math.round(bar * 14.5038) + ' psi'; }
+const { shownUnits, presText } = require('./tyres');
+function pres(bar, unit) { return presText(bar, unit); }
 
 /** stage 4 (coldest tyre warming) and the anytime pressure warning */
 function drawTyres(cv, ph, d, opts, deg) {
@@ -230,9 +231,12 @@ class WarmHud {
             tyres: set.get('tyres') !== false,
             tyreReady: Number(set.get('tyreReady')) || 25,
             pressureWarn: Number(set.get('pressureWarn')) || 0,
-            pressureUnit: set.get('pressureUnit') || 'psi',
-            tempUnit: set.get('tempUnit'),
+            pressureUnit: null,
+            tempUnit: null,
         };
+        if (d.units) this.carUnits = d.units;
+        const su = shownUnits(set, this.carUnits);
+        o.pressureUnit = su.press; o.tempUnit = su.temp;
         let ph = this._phase(d, o);
         /* a low tyre shows whatever the warm-up is doing, and after it is done */
         const low = d.tyres && d.tyres.lowest;

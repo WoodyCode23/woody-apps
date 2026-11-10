@@ -94,4 +94,22 @@ class Tyres {
     }
 }
 
-module.exports = { Tyres: Tyres, CORNERS: CORNERS };
+/**
+ * The units to show: a setting of 'car' (the default) follows the car's own display units, else the setting.
+ *   -> { temp: 'c' | 'f', press: 'psi' | 'bar' | 'kpa' }
+ */
+function shownUnits(settings, carUnits) {
+    const u = carUnits || {};
+    let temp = settings.get('tempUnit') || 'car', press = settings.get('pressureUnit') || 'car';
+    if (temp === 'car') temp = u.temp === 'F' || (!u.temp && u.psiSeen) ? 'f' : u.temp === 'C' ? 'c' : 'c';
+    if (press === 'car') press = u.press === 'PSI' || (!u.press && u.psiSeen) ? 'psi' : u.press === 'KPA' ? 'kpa' : u.press === 'BAR' ? 'bar' : 'psi';
+    return { temp: temp, press: press };
+}
+
+/** bar -> text in the unit */
+function presText(bar, unit) {
+    if (typeof bar !== 'number' || !isFinite(bar)) return '--';
+    return unit === 'bar' ? bar.toFixed(1) + ' bar' : unit === 'kpa' ? Math.round(bar * 100) + ' kPa' : Math.round(bar * 14.5038) + ' psi';
+}
+
+module.exports = { Tyres: Tyres, CORNERS: CORNERS, shownUnits: shownUnits, presText: presText };

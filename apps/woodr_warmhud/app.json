@@ -2,7 +2,7 @@
   "id": "woodr_warmhud",
   "title": "Warm-Up HUD",
   "description": "Warm-up on the head-up display: oil, then the gearbox, then the tyres, then it turns itself off. Warns of a low tyre any time.",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "vendor": "custom",
   "loggingId": "OAA6",
   "iconGlyph": "warmup",
@@ -164,8 +164,12 @@
       "key": "pressureUnit",
       "label": "Pressure unit",
       "type": "choice",
-      "default": "psi",
+      "default": "car",
       "options": [
+        [
+          "car",
+          "Same as the car"
+        ],
         [
           "psi",
           "psi"
@@ -173,6 +177,10 @@
         [
           "bar",
           "bar"
+        ],
+        [
+          "kpa",
+          "kPa"
         ]
       ]
     },
@@ -204,8 +212,12 @@
       "key": "tempUnit",
       "label": "Temperature unit",
       "type": "choice",
-      "default": "c",
+      "default": "car",
       "options": [
+        [
+          "car",
+          "Same as the car"
+        ],
         [
           "c",
           "Celsius"
