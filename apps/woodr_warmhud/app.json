@@ -2,7 +2,7 @@
   "id": "woodr_warmhud",
   "title": "Warm-Up HUD",
   "description": "Warm-up on the head-up display: oil, then the gearbox, then the tyres, then it turns itself off. Warns of a low tyre any time.",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "vendor": "custom",
   "loggingId": "OAA6",
   "iconGlyph": "warmup",

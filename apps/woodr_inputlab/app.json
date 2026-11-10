@@ -2,7 +2,7 @@
   "id": "woodr_inputlab",
   "title": "Input Lab",
   "description": "Shows which steering-wheel, stalk, console and gesture inputs the head unit sees, live, so apps can use them. Listens only: nothing is sent to the car.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "vendor": "custom",
   "loggingId": "OAAB",
   "iconGlyph": "live_data",

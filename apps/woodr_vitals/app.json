@@ -2,7 +2,7 @@
   "id": "woodr_vitals",
   "title": "M3 Vitals",
   "description": "Oil and coolant warm-up state, drivetrain readout and 12 V battery charge",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "vendor": "custom",
   "loggingId": "OAA5",
   "iconGlyph": "car_vitals",
