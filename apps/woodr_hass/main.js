@@ -59,9 +59,25 @@ mgu.run({
                 }
                 armed = null;
             }
-            const parts = tile.tap === 'toggle' ? ['homeassistant', 'toggle'] : tile.tap.split('.');
+            let parts = tile.tap === 'toggle' ? ['homeassistant', 'toggle'] : tile.tap.split('.');
             if (parts.length !== 2) { say('Bad tap action: ' + tile.tap); return; }
-            const data = Object.assign({ entity_id: tile.entity }, tile.data || {});
+            const domain = tile.entity.split('.')[0];
+            /* Doors and locks act only on a CURRENT state: offline or stale = refuse, never guess. */
+            if (config.SENSITIVE.indexOf(domain) >= 0 || config.SENSITIVE.indexOf(parts[0]) >= 0) {
+                const st = ha.fresh(tile.entity);
+                if (!st) { say(tile.name + ': state unknown (Home Assistant not live), not sent', 8); return; }
+                if (tile.tap === 'cover.smart') {
+                    if (st.state === 'closed') parts = ['cover', 'open_cover'];
+                    else if (st.state === 'open') parts = ['cover', 'close_cover'];
+                    else { say(tile.name + ' is ' + st.state + ': wait, then try again', 6); return; }
+                }
+            }
+            if (parts[0] === 'lock' && parts[1] === 'unlock' && !cfg.allowUnlock) {
+                say(tile.name + ': unlocking from the car is off (ha.json "allowUnlock")', 8);
+                return;
+            }
+            /* the tile's own entity always wins over anything in its data */
+            const data = Object.assign({}, tile.data || {}, { entity_id: tile.entity });
             busy[tile.entity] = true;
             refresh();
             ha.call(parts[0], parts[1], data)
@@ -72,7 +88,9 @@ mgu.run({
         /* ---------------- the HA connection ---------------- */
 
         ha.on('link', (how, why) => { log.info('link: ' + how + ' - ' + why); refresh(); });
-        ha.on('states', () => refresh());
+        /* follow only what the pages, the doorbell and the dashboard definition need */
+        const follow = () => ha.setWanted(config.wantedEntities(cfg, pages()));
+        ha.on('states', () => { follow(); refresh(); });
         ha.on('state', (entity, st) => {
             /* The doorbell trigger: a state_changed into the configured state. */
             const d = cfg.doorbell;
@@ -82,6 +100,7 @@ mgu.run({
             /* Only redraw for something on screen, or the dashboard definition changing. */
             const p = page();
             const mine = p && p.tiles.some((t) => t.entity === entity);
+            if (entity === cfg.dashboardEntity) follow();
             if (mine || entity === cfg.dashboardEntity) refresh();
         });
 
@@ -126,7 +145,8 @@ mgu.run({
                 cv.text('Copy ha.json to ' + cfg.file, 56, 256, 22, t.dim);
                 cv.text('See ha-design/OPEN_QUESTIONS.md for what it needs.', 56, 294, 22, t.dim);
             } else {
-                Tiles.draw(cv, t, p, (e) => ha.get(e), (tile) => activate(tile), sel, busy);
+                /* fresh(): offline tiles read as unknown, never as the last state seen */
+                Tiles.draw(cv, t, p, (e) => ha.fresh(e), (tile) => activate(tile), sel, busy);
             }
             drawFooter(cv, t);
             G.frame(cv, t, ['Home Assistant'], 0, []);
@@ -154,6 +174,7 @@ mgu.run({
             if (key === 'reload' && settings.get('reload') === true) {
                 cfg = config.load(ctx.dataDir, log);
                 ha.cfg = cfg; push.cfg = cfg; doorbell.cfg = cfg;
+                follow();
                 settings.set('reload', false);
                 say('ha.json reloaded');
                 if (ha.link === 'down' && cfg.baseUrl && cfg.token) { ha.stopped = false; ha.start(); }
@@ -175,6 +196,7 @@ mgu.run({
 
         doorbell.start();
         push.start();
+        follow();
         ha.start();
 
         process.on('exit', () => { doorbell.stop(); push.stop(); ha.stop(); });

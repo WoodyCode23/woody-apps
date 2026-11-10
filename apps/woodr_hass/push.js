@@ -65,7 +65,7 @@ class Push extends EventEmitter {
     status() {
         return {
             on: this.settings.get('pushCar') === true,
-            how: this.cfg.push && this.cfg.push.webhook ? 'webhook ' + this.cfg.push.webhook : 'service calls',
+            how: this.cfg.push && this.cfg.push.webhook ? 'webhook' : 'service calls',
             sent: this.sent, failed: this.failed, error: this.error,
             lastAt: this.lastAt,
         };

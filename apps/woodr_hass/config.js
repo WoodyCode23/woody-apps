@@ -44,6 +44,9 @@
 const fs = require('fs');
 const path = require('path');
 
+/* A tap on these opens, unlocks or disarms something at the house: always press twice, never a blind
+ * toggle (a resent toggle reverses itself), and the target is always the tile's own entity. */
+const SENSITIVE = ['lock', 'cover', 'alarm_control_panel', 'valve', 'homeassistant'];
 const TOGGLEABLE = ['light', 'switch', 'fan', 'input_boolean', 'automation', 'climate', 'media_player', 'humidifier', 'siren'];
 
 const DEFAULTS = {
@@ -62,8 +65,8 @@ function defaultTap(entity) {
     const domain = String(entity || '').split('.')[0];
     if (domain === 'scene') return 'scene.turn_on';
     if (domain === 'script') return 'script.turn_on';
-    if (domain === 'cover') return 'cover.toggle';
-    if (domain === 'lock') return 'lock.unlock';
+    if (domain === 'cover') return 'cover.smart';      /* open if closed, close if open, else refuse (main.js) */
+    if (domain === 'lock') return 'lock.lock';         /* unlocking from the car needs "allowUnlock" (main.js) */
     if (domain === 'button' || domain === 'input_button') return domain + '.press';
     return TOGGLEABLE.indexOf(domain) >= 0 ? 'toggle' : 'none';
 }
@@ -71,13 +74,21 @@ function defaultTap(entity) {
 /** One tile, with everything filled in and nothing trusted. */
 function cleanTile(t) {
     if (!t || typeof t.entity !== 'string' || t.entity.indexOf('.') < 0) return null;
+    const domain = t.entity.split('.')[0];
+    let tap = typeof t.tap === 'string' && t.tap ? t.tap : defaultTap(t.entity);
+    const tapDomain = tap === 'toggle' ? 'homeassistant' : tap.split('.')[0];
+    const sensitive = SENSITIVE.indexOf(domain) >= 0 || SENSITIVE.indexOf(tapDomain) >= 0;
+    if (domain === 'cover' && /(^|\.)toggle$/.test(tap)) tap = 'cover.smart';
+    if (domain === 'lock' && /(^|\.)toggle$/.test(tap)) tap = 'lock.lock';
+    const data = t.data && typeof t.data === 'object' ? Object.assign({}, t.data) : null;
+    if (data) delete data.entity_id;                   /* a tile only ever acts on its own entity */
     return {
         entity: t.entity,
         name: typeof t.name === 'string' && t.name ? t.name : t.entity.split('.')[1].replace(/_/g, ' '),
-        tap: typeof t.tap === 'string' && t.tap ? t.tap : defaultTap(t.entity),
-        data: t.data && typeof t.data === 'object' ? t.data : null,
+        tap: tap,
+        data: data,
         unit: typeof t.unit === 'string' ? t.unit : '',
-        confirm: t.confirm === true,
+        confirm: t.confirm === true || sensitive,      /* forced for the house's doors and locks, whatever the config says */
     };
 }
 
@@ -110,6 +121,7 @@ function load(dataDir, log) {
     ['baseUrl', 'token', 'dashboardEntity'].forEach((k) => { if (typeof raw[k] === 'string') cfg[k] = raw[k].trim(); });
     if (cfg.baseUrl) cfg.baseUrl = cfg.baseUrl.replace(/\/+$/, '');
     if (raw.verifyTls === false) cfg.verifyTls = false;
+    cfg.allowUnlock = raw.allowUnlock === true;        /* off unless ha.json says so: lock.unlock refused from the car */
     if (Array.isArray(raw.extraEvents)) cfg.extraEvents = raw.extraEvents.filter((s) => typeof s === 'string').slice(0, 8);
     cfg.pages = cleanPages(raw.pages);
     if (raw.push && typeof raw.push === 'object') {
@@ -151,4 +163,14 @@ function pagesFor(cfg, state) {
     return { pages: cfg.pages, from: cfg.pages.length ? 'file' : 'none' };
 }
 
-module.exports = { load, pagesFor, cleanPages, defaultTap, TOGGLEABLE };
+/** Every entity the app needs live: all pages' tiles, the doorbell trigger, the dashboard definition. */
+function wantedEntities(cfg, pages) {
+    const out = {};
+    (pages || []).forEach((p) => p.tiles.forEach((t) => { out[t.entity] = true; }));
+    (cfg.pages || []).forEach((p) => p.tiles.forEach((t) => { out[t.entity] = true; }));
+    if (cfg.doorbell && cfg.doorbell.entity) out[cfg.doorbell.entity] = true;
+    if (cfg.dashboardEntity) out[cfg.dashboardEntity] = true;
+    return Object.keys(out).sort();
+}
+
+module.exports = { load, pagesFor, cleanPages, defaultTap, wantedEntities, TOGGLEABLE, SENSITIVE };

@@ -2,7 +2,7 @@
   "id": "woodr_hass",
   "title": "Home Assistant",
   "description": "Home Assistant on the centre screen: entity tiles, service buttons, car state pushed to HA, and the front doorbell camera on the instrument cluster",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "vendor": "custom",
   "loggingId": "OAA8",
   "iconGlyph": "live_data",

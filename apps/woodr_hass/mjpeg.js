@@ -19,6 +19,7 @@
 const http = require('http');
 const https = require('https');
 const url = require('url');
+const lease = require('./netlease');
 const EventEmitter = require('events');
 
 const MAX_JPEG = 3 * 1024 * 1024;        /* a doorbell still is tens of KB; this is a sanity cap */
@@ -66,6 +67,7 @@ class Stream extends EventEmitter {
         const lib = secure ? https : http;
         const req = lib.request({
             protocol: u.protocol, hostname: u.hostname, port: u.port || (secure ? 443 : 80),
+            lookup: lease.lookup,
             method: 'GET', path: '/api/camera_proxy_stream/' + encodeURIComponent(this.entity),
             headers: { Authorization: 'Bearer ' + this.cfg.token, Accept: 'multipart/x-mixed-replace' },
             rejectUnauthorized: secure ? this.cfg.verifyTls !== false : undefined,
