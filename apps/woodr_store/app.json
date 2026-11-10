@@ -2,7 +2,7 @@
   "id": "woodr_store",
   "title": "Woody Apps",
   "description": "Your own store for this car: every source grouped by developer, versions, what each app needs, install and update. Runs on mgu-updater and mgu-deploy.",
-  "version": "0.4.2",
+  "version": "1.0.0",
   "vendor": "custom",
   "loggingId": "OAAA",
   "iconGlyph": "live_data",

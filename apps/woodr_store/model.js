@@ -79,7 +79,13 @@ function rows(groups, open) {
 
 /* a believable state for the desktop preview, where there is no updater */
 const DEMO = {
-    type: 'state', online: true, updater: { version: '0.8.35' }, unit: { hmi: 'ID7', firmware: 'BMW MGU P18_23w44.2-1-3 mgu-high' },
+    type: 'state', online: true,
+    uplink: { state: 'online', device: { kind: 'wifi', name: 'HomeNet' }, usbPhone: { on: false },
+        wifi: { enabled: true, ssid: 'HomeNet', ip: '192.168.1.40', signal: -62, networks: [
+            { ssid: 'HomeNet', signal: -62, secure: true, saved: true, current: true },
+            { ssid: 'Phone hotspot', signal: -70, secure: true, saved: true },
+            { ssid: 'Neighbour', signal: -82, secure: true, saved: false }] } },
+    web: { enabled: false, urls: [] }, updater: { version: '0.8.35' }, unit: { hmi: 'ID7', firmware: 'BMW MGU P18_23w44.2-1-3 mgu-high' },
     catalog: { checkedAt: Date.now() - 120000, checking: false, error: null },
     sources: [
         { id: 'woody-apps', label: 'WoodyCode23/woody-apps', channel: 'branch:main', status: 'ok', components: 5 },

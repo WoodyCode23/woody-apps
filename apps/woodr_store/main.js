@@ -17,10 +17,13 @@ const G = require('./kit/gauges');
 const { withAlpha } = require('./kit/canvas');
 const { UpdaterClient } = require('./updater_client');
 const M = require('./model');
+const SV = require('./settings_view');
+const qrcode = require('./qrcode');
+const CAR = '__car';                  /* the "Wi-Fi, sources, restart" page, opened like a folder */
 const { Progress } = require('./progress');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '0.4.2';
+const APP_ID = 'woodr_store', VERSION = '1.0.0';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
@@ -91,7 +94,22 @@ mgu.run({
             if (!state && !live && Date.now() - t0 > 3000) { demo = true; return M.DEMO; }
             return state;
         };
-        const listRows = () => { const s = current(); return s ? M.rows(M.group(s), open) : []; };
+        const listRows = () => {
+            const s = current();
+            if (!s) return [];
+            if (open === CAR) return [{ back: { dev: CAR } }].concat(SV.rows(s).map((x) => (x.header ? { header: x.header } : { setting: x })));
+            return M.rows(M.group(s), open).concat(open ? [] : [{ carEntry: true }]);
+        };
+        let setArmed = null, setArmedAt = 0;
+        function pressSetting(x) {
+            if (!x.act) { note = x.info || ''; noteAt = Date.now(); return; }
+            if (demo) { note = 'Preview: nothing changes'; noteAt = Date.now(); return; }
+            if (!client.secret) { note = 'Needs Store powers: phase 2 makes Woody Apps the Store'; noteAt = Date.now(); return; }
+            if (x.confirm && (setArmed !== x.key || Date.now() - setArmedAt > 5000)) { setArmed = x.key; setArmedAt = Date.now(); note = 'Press again: ' + x.label.trim(); noteAt = Date.now(); return; }
+            setArmed = null;
+            client._priv(Object.assign({}, x.act));
+            note = x.label.trim() + ': sent'; noteAt = Date.now();
+        }
         const selectedRow = () => listRows()[sel] || null;
         const selected = () => { const r = selectedRow(); return r && r.item ? r.item : null; };
 
@@ -109,6 +127,8 @@ mgu.run({
         function enter(row) {
             if (!row) return;
             if (row.updateAll) { updateAll(row); return; }
+            if (row.carEntry) { open = CAR; scrollY = 0; armed = null; sel = 1; return; }
+            if (row.setting) { pressSetting(row.setting); return; }
             if (row.folder) {
                 open = row.folder.dev; scrollY = 0; armed = null;
                 const r = listRows(); sel = Math.max(0, r.findIndex((x) => x.item)); return;
@@ -117,7 +137,7 @@ mgu.run({
                 const left = open;
                 open = null; scrollY = 0; armed = null;
                 const r = listRows();
-                sel = Math.max(0, r.findIndex((x) => x.folder && x.folder.dev === left));
+                sel = Math.max(0, r.findIndex((x) => (x.folder && x.folder.dev === left) || (left === CAR && x.carEntry)));
             }
         }
 
@@ -140,7 +160,7 @@ mgu.run({
 
         function drawList(cv, t) {
             const p = { x: 24, y: 44, w: 860, h: 468 };
-            G.panel(cv, t, p.x, p.y, p.w, p.h, open ? (open === 'Woody' ? 'My apps' : open) : 'Developers');
+            G.panel(cv, t, p.x, p.y, p.w, p.h, open === CAR ? 'Wi-Fi, sources and restart' : open ? (open === 'Woody' ? 'My apps' : open) : 'Developers');
             const r = listRows();
             if (!r.length) { cv.text(live ? 'The updater lists nothing yet' : 'Connecting to the updater...', 48, 130, 24, t.dim); return; }
             if (open && !r[0].back) open = null;          /* the folder went away (its source removed) */
@@ -156,6 +176,25 @@ mgu.run({
             r.forEach((row, i) => {
                 const ry = top + ys[i] - scrollY;
                 if (ry > bottom || ry + ROW < top) return;
+                if (row.header) {
+                    cv.text(row.header.toUpperCase(), 48, ry + 30, 18, AMBER, { font: 'bold', spacing: 1.5 });
+                    return;
+                }
+                if (row.carEntry || row.setting) {
+                    const on = i === sel, x = row.setting;
+                    if (on) cv.roundRect(40, ry + 2, p.w - 32, ROW - 6, 10, withAlpha(t.accent, 0.18));
+                    if (row.carEntry) {
+                        cv.text('Wi-Fi, sources and restart', 60, ry + 26, 24, t.text, { font: 'bold' });
+                        cv.text('everything the stock Store\'s settings do', 60, ry + 48, 18, t.dim);
+                        cv.text('Open  >', p.x + p.w - 30, ry + 36, 20, t.dim, { font: 'bold', align: 'right' });
+                    } else {
+                        const armedNow = setArmed === x.key && Date.now() - setArmedAt < 5000;
+                        cv.text(x.label, 60, ry + 36, 22, x.act ? t.text : t.dim, { font: on ? 'bold' : undefined });
+                        cv.text(armedNow ? 'press again' : x.value || '', p.x + p.w - 30, ry + 36, 20, armedNow ? ORANGE : x.colour || t.dim, { font: 'bold', align: 'right' });
+                    }
+                    if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; enter(row); return render(); }, 's' + i + (open || ''), 10);
+                    return;
+                }
                 if (row.updateAll) {
                     const on = i === sel, armedNow = Date.now() - allArmedAt < 5000;
                     cv.roundRect(40, ry + 2, p.w - 32, ROW - 6, 10, withAlpha(armedNow ? ORANGE : AMBER, on ? 0.38 : 0.2));
@@ -202,6 +241,28 @@ mgu.run({
             G.panel(cv, t, p.x, p.y, p.w, p.h, demo ? 'Details  (PREVIEW - sample data)' : 'Details');
             const c = selected();
             const row = selectedRow();
+            if (!c && row && (row.setting || row.carEntry)) {
+                const x = row.setting;
+                let sy = p.y + 92;
+                cv.text(x ? x.label.trim() : 'Wi-Fi, sources and restart', p.x + 24, sy, 30, t.text, { font: 'bold' }); sy += 40;
+                const info = x ? x.info : 'Wi-Fi on/off and networks, USB tethering, sources, the phone page and restart. These need Store powers: they work once Woody Apps is the Store (phase 2).';
+                wrap(cv, info, 20, p.w - 48, 4).forEach((l) => { cv.text(l, p.x + 24, sy, 20, t.dim); sy += 28; });
+                if (!client.secret) { sy += 10; cv.text('Store powers: not yet (phase 2)', p.x + 24, sy, 20, AMBER, { font: 'bold' }); sy += 30; }
+                /* the phone page's address as a QR code, from the file the updater writes for the Store */
+                if (x && x.web) {
+                    let url = '';
+                    try { url = fs.readFileSync(path.join(ctx.dataDir, 'web-url'), 'utf8').trim(); } catch (e) { url = ''; }
+                    if (url) {
+                        const q = qrcode(0, 'M'); q.addData(url); q.make();
+                        const n = q.getModuleCount(), cell = Math.max(3, Math.floor(200 / (n + 8))), size = (n + 8) * cell;
+                        const qx = p.x + 24, qy = sy + 6;
+                        cv.fillRect(qx, qy, size, size, '#ffffff');
+                        for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) if (q.isDark(a, b)) cv.fillRect(qx + (b + 4) * cell, qy + (a + 4) * cell, cell, cell, '#000000');
+                        cv.text('Join the car\'s Wi-Fi hotspot, then scan', qx + size + 20, qy + 40, 20, t.text);
+                    } else if ((current() || {}).web && current().web.enabled) cv.text('Waiting for the page address...', p.x + 24, sy + 30, 20, t.dim);
+                }
+                return;
+            }
             if (!c && row && row.updateAll) {
                 let uy = p.y + 92;
                 cv.text('Update all', p.x + 24, uy, 32, AMBER, { font: 'bold' }); uy += 38;
@@ -313,7 +374,7 @@ mgu.run({
         }
 
         ctx.onScroll((dy) => { const before = sel; move(dy > 0 ? 1 : -1); render().catch(() => {}); return before !== sel; });
-        ui.onClick('BTN_ACTION', () => { const row = selectedRow(); if (row && (row.folder || row.back || row.updateAll)) enter(row); else act(selected()); return render(); });
+        ui.onClick('BTN_ACTION', () => { const row = selectedRow(); if (row && (row.folder || row.back || row.updateAll || row.carEntry || row.setting)) enter(row); else act(selected()); return render(); });
         ui.onClick('BTN_PAGE', () => { move(1); return render(); });
         ui.onClick('BTN_PREV', () => { move(-1); return render(); });
         ui.onClick('BTN_RESTART', () => { restart(); return render(); });
