@@ -1,0 +1,42 @@
+{
+  "id": "woodr_vitals",
+  "title": "M3 Vitals",
+  "description": "Oil and coolant warm-up state, drivetrain readout and 12 V battery charge",
+  "version": "0.1.0",
+  "vendor": "custom",
+  "loggingId": "OAA5",
+  "iconGlyph": "car_vitals",
+  "mguHmi": ["ID7"],
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineTemperature": "rs",
+      "statusEngineSpeed2": "rs",
+      "statusBattery2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "_optional": "gear and selector position",
+      "statusGearboxDrive": "rs",
+      "DataPowerTrain2": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "M3 Vitals",
+      "buttons": [
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "tempUnit", "label": "Temperature unit", "type": "choice", "default": "c",
+     "options": [["c", "Celsius"], ["f", "Fahrenheit"]]},
+    {"key": "speedUnit", "label": "Speed unit", "type": "choice", "default": "mph",
+     "options": [["kmh", "km/h"], ["mph", "mph"]]},
+    {"key": "oilReady", "label": "Oil ready above", "type": "number", "unit": "C", "default": 90, "steps": [80, 85, 90, 95, 100]}
+  ]
+}

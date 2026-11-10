@@ -1,0 +1,54 @@
+{
+  "id": "woodr_hass",
+  "title": "Home Assistant",
+  "description": "Home Assistant on the centre screen: entity tiles, service buttons, car state pushed to HA, and the front doorbell camera on the instrument cluster",
+  "version": "0.1.0",
+  "vendor": "custom",
+  "loggingId": "OAA8",
+  "iconGlyph": "live_data",
+  "mguHmi": ["ID7"],
+  "internet": true,
+  "signals": {
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs",
+      "statusEngineTemperature": "rs"
+    },
+    "de.bmw.infrastructure.VehicleCondition": {
+      "_optional": "ignition / drive-ready state, for the doorbell safety gate and HA presence",
+      "VehicleCondition": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "_optional": "selector position P/R/N/D, for the doorbell safety gate",
+      "statusGearboxDrive": "rs",
+      "DataPowerTrain2": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Home Assistant",
+      "buttons": [
+        ["BTN_ACTION", "Activate tile"],
+        ["BTN_PAGE", "Next page"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "pushCar", "label": "Send car state to Home Assistant", "type": "bool", "default": false},
+    {"key": "pushEvery", "label": "Send car state every", "type": "number", "unit": "s", "default": 30,
+     "steps": [10, 15, 30, 60, 120, 300], "when": {"pushCar": true}},
+    {"key": "pushMoving", "label": "Faster while moving", "type": "bool", "default": true, "when": {"pushCar": true}},
+    {"key": "doorbell", "label": "Doorbell on the cluster", "type": "choice", "default": "parked",
+     "options": [["off", "Off"], ["parked", "Only when stationary"], ["banner", "Text only while moving"], ["always", "Always (not recommended)"]]},
+    {"key": "doorbellSecs", "label": "Doorbell shows for", "type": "number", "unit": "s", "default": 20,
+     "steps": [10, 15, 20, 30, 45, 60]},
+    {"key": "doorbellFps", "label": "Doorbell frames a second", "type": "number", "default": 3, "steps": [1, 2, 3, 5, 8]},
+    {"key": "contend", "label": "Take the cluster slot from BMW", "type": "bool", "default": false},
+    {"key": "reload", "label": "Reload ha.json now", "type": "bool", "default": false}
+  ]
+}

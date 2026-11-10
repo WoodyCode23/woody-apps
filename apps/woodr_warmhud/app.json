@@ -1,0 +1,172 @@
+{
+  "id": "woodr_warmhud",
+  "title": "Warm-Up HUD",
+  "description": "Warm-up on the head-up display: oil first, then the gearbox, then it turns itself off",
+  "version": "0.5.0",
+  "vendor": "custom",
+  "loggingId": "OAA6",
+  "iconGlyph": "warmup",
+  "autostart": true,
+  "mguHmi": [
+    "ID7"
+  ],
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineTemperature": "rs",
+      "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "gearbox oil temperature when the gearbox unit doesn't answer",
+      "basicDataSet": "s"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_optional": "read-only diagnostics (UDS 22 only) to read the gearbox temperature",
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Warm-Up HUD",
+      "buttons": [
+        [
+          "BTN_ACTION",
+          "HUD on/off"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "hud",
+      "label": "Show on head-up display",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "readyAt",
+      "label": "Oil ready above",
+      "type": "number",
+      "unit": "C",
+      "default": 90,
+      "steps": [
+        80,
+        85,
+        90,
+        95,
+        100
+      ]
+    },
+    {
+      "key": "trans",
+      "label": "Gearbox warm-up after oil",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "transReady",
+      "label": "Gearbox ready above",
+      "type": "number",
+      "unit": "C",
+      "default": 70,
+      "steps": [
+        50,
+        60,
+        65,
+        70,
+        75,
+        80
+      ],
+      "when": {
+        "trans": true
+      }
+    },
+    {
+      "key": "hideWhenReady",
+      "label": "Turn off once warm",
+      "type": "choice",
+      "default": "30",
+      "options": [
+        [
+          "0",
+          "Never - keep showing"
+        ],
+        [
+          "10",
+          "10 s after ready"
+        ],
+        [
+          "30",
+          "30 s after ready"
+        ],
+        [
+          "60",
+          "60 s after ready"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "Temperature unit",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "Celsius"
+        ],
+        [
+          "f",
+          "Fahrenheit"
+        ]
+      ]
+    },
+    {
+      "key": "posY",
+      "label": "Vertical position (within the clear area)",
+      "type": "number",
+      "unit": "px",
+      "default": 185,
+      "steps": [
+        185,
+        190,
+        195,
+        198
+      ]
+    },
+    {
+      "key": "scale",
+      "label": "Size",
+      "type": "choice",
+      "default": "100",
+      "options": [
+        [
+          "80",
+          "Small"
+        ],
+        [
+          "100",
+          "Standard"
+        ],
+        [
+          "110",
+          "Large (fits the clear area)"
+        ]
+      ]
+    }
+  ]
+}
