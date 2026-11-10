@@ -19,7 +19,7 @@ const { UpdaterClient } = require('./updater_client');
 const M = require('./model');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '0.2.1';
+const APP_ID = 'woodr_store', VERSION = '0.3.0';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
@@ -47,6 +47,7 @@ mgu.run({
         let state = null, live = false, demo = false, note = '', noteAt = 0;
         let sel = 0, scrollY = 0, armed = null, armedAt = 0;
         let open = null;                   /* the developer folder shown, or null for the folder list */
+        let rebootArmedAt = 0;             /* restart: first press arms, a second within 5 s restarts */
         const t0 = Date.now();
 
         const client = new UpdaterClient({ hello: { id: APP_ID, version: VERSION } });
@@ -195,14 +196,41 @@ mgu.run({
             cv.text(priv ? 'Store powers: ON' : 'Uninstall / rollback: phase 2', p.x + p.w - 24, by + 33, 18, priv ? GREEN : t.dim, { align: 'right' });
         }
 
+        /* installed apps that only take effect after a restart of the head unit */
+        const waitingOnRestart = () => {
+            const s = current() || {};
+            return (s.components || []).filter((c) => c.pendingReboot || c.nextStart || c.tileHidden);
+        };
+
+        function restart() {
+            if (demo) { note = 'Preview: nothing restarts'; noteAt = Date.now(); return; }
+            if (!client.secret) {
+                note = 'Restart needs Store powers (phase 2): use the stock Store > Settings for now';
+                noteAt = Date.now(); return;
+            }
+            if (Date.now() - rebootArmedAt > 5000) { rebootArmedAt = Date.now(); note = 'Press Restart again to restart the head unit'; noteAt = Date.now(); return; }
+            rebootArmedAt = 0;
+            client.reboot();
+            note = 'Restarting the head unit...'; noteAt = Date.now();
+        }
+
         function drawStatus(cv, t) {
             const s = current() || {};
+            const wait = waitingOnRestart();
+            if (wait.length || s.rebooting) {
+                const names = wait.slice(0, 3).map((c) => c.title || c.id).join(', ') + (wait.length > 3 ? ' +' + (wait.length - 3) : '');
+                const msg = s.rebooting ? 'Restarting...' : 'Restart to finish: ' + names;
+                cv.roundRect(220, 8, 660, 30, 8, withAlpha(AMBER, 0.22));
+                cv.text(msg, 236, 30, 18, AMBER, { font: 'bold' });
+            }
+            if (s.rebootError) cv.text('Restart failed: ' + s.rebootError, 236, 30, 18, ORANGE);
             const online = s.online ? 'online' : 'offline';
             const cat = s.catalog || {};
             const bits = [live ? 'updater ' + ((s.updater && s.updater.version) || '') : demo ? 'PREVIEW' : 'updater not reachable',
                 online, cat.checking ? 'checking...' : 'checked ' + ago(cat.checkedAt)];
             cv.text(bits.join('   ·   '), W - 24, 32, 18, live ? t.dim : AMBER, { align: 'right' });
-            if (note && Date.now() - noteAt < 6000) cv.text(note, 300, 32, 18, AMBER);
+            if (note && Date.now() - noteAt < 6000 && !(waitingOnRestart().length)) cv.text(note, 236, 32, 18, AMBER);
+            else if (note && Date.now() - noteAt < 6000) cv.text(note, 900, 32, 18, AMBER);
         }
 
         async function render() {
@@ -219,6 +247,7 @@ mgu.run({
         ui.onClick('BTN_ACTION', () => { const row = selectedRow(); if (row && (row.folder || row.back)) enter(row); else act(selected()); return render(); });
         ui.onClick('BTN_PAGE', () => { move(1); return render(); });
         ui.onClick('BTN_PREV', () => { move(-1); return render(); });
+        ui.onClick('BTN_RESTART', () => { restart(); return render(); });
         ui.onClick('BTN_CHECK', () => { if (!demo) client.check(); note = 'Checking every source...'; noteAt = Date.now(); return render(); });
 
         ctx.loop('MAIN', 2, render);

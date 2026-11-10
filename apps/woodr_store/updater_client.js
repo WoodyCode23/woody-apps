@@ -72,6 +72,7 @@ class UpdaterClient extends EventEmitter {
     uninstall(id) { return this._priv({ op: 'uninstall', id: id }); }
     rollback(id) { return this._priv({ op: 'rollback', id: id }); }
     logs(unit, lines) { return this._priv({ op: 'logs', unit: unit, lines: lines || 80 }); }
+    reboot() { return this._priv({ op: 'reboot' }); }
 
     close() { clearTimeout(this.timer); this.timer = null; if (this.sock) { this.sock.removeAllListeners('close'); this.sock.destroy(); this.sock = null; } }
 }

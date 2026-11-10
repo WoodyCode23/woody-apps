@@ -11,6 +11,7 @@
  */
 const mgu = require('./kit/mgu');
 const G = require('./kit/gauges');
+const { withAlpha } = require('./kit/canvas');
 const Lab = require('./lab');
 
 const W = 1600, H = 520;
@@ -21,7 +22,7 @@ mgu.run({
         const { ui, settings, log } = ctx;
         let proxy = null, linkError = null;
         const st = { slot: null, own: null, raw: {}, seen: 0, changedAt: 0 };
-        let idx = 0, last = null, before = null, restoreTimer = null, restoreAt = 0, lastWrite = 0, busy = false;
+        let idx = 1, last = null, before = null, restoreTimer = null, restoreAt = 0, lastWrite = 0, busy = false;
 
         const sub = await ctx.signals.watch(LIGHT, '1', {
             statusAmbientLightInteriorColour: (v) => {
@@ -107,7 +108,15 @@ mgu.run({
                 const v = verdict(); if (v) cv.text(v, 828, 364, 22, /CHANGED/.test(v) ? '#2fd27a' : t.dim, { font: 'bold' });
             }
             if (restoreAt) cv.text('Restoring your colour in ' + Math.max(0, Math.ceil((restoreAt - Date.now()) / 1000)) + ' s', 828, 430, 22, '#ffd34d');
-            cv.text('Page buttons pick a test, the action button runs it.', 828, 480, 18, t.dim);
+            /* on-screen controls: some HMI layouts show no page buttons. Touch these, or turn the controller. */
+            const btn = (x, w, label, col, key, fn) => {
+                cv.roundRect(x, 450, w, 52, 12, col);
+                cv.text(label, x + w / 2, 484, 24, t.text, { font: 'bold', align: 'center' });
+                if (cv.own) cv.target(x, 450, w, 52, fn, key, 12);
+            };
+            btn(828, 130, '<  Prev', withAlpha(t.text, 0.12), 'prev', () => { step(-1); return render(); });
+            btn(970, 300, 'RUN TEST', withAlpha('#2fd27a', allowed() ? 0.35 : 0.12), 'run', () => run());
+            btn(1282, 130, 'Next  >', withAlpha(t.text, 0.12), 'next', () => { step(1); return render(); });
         }
 
         async function render() {
@@ -120,8 +129,10 @@ mgu.run({
         }
 
         ui.onClick('BTN_ACTION', () => run());
-        ui.onClick('BTN_PAGE', () => { idx = (idx + 1) % Lab.TESTS.length; return render(); });
-        ui.onClick('BTN_PREV', () => { idx = (idx + Lab.TESTS.length - 1) % Lab.TESTS.length; return render(); });
+        function step(d) { idx = (idx + d + Lab.TESTS.length) % Lab.TESTS.length; }
+        ui.onClick('BTN_PAGE', () => { step(1); return render(); });
+        ui.onClick('BTN_PREV', () => { step(-1); return render(); });
+        ctx.onScroll((dy) => { step(dy > 0 ? 1 : -1); render().catch(() => {}); return true; });
         settings.onChange(() => render().catch(() => {}));
         process.on('exit', () => { if (before && proxy) { try { ctx.signals.set(proxy, 'ambientLightInteriorColour', Lab.restoreFrom(before)); } catch (e) { /* leaving */ } } });
 
