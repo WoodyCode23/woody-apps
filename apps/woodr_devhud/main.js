@@ -17,7 +17,7 @@ const { UpdaterClient } = require('./updater_client');
 const { DevHud, rows, draw, IW, IH } = require('./devhud');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_devhud', VERSION = '0.1.0';
+const APP_ID = 'woodr_devhud', VERSION = '0.1.1';
 const LEASE = '/run/mgu-uplink/lease.json';
 const FEED_FRESH_MS = 60000;
 const MOVING_KMH = 5;

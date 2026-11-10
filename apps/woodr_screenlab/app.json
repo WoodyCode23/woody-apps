@@ -2,7 +2,7 @@
   "id": "woodr_screenlab",
   "title": "Screen Lab",
   "description": "Calibration patterns for the head-up display, instrument cluster and centre screen: grids, rulers and a movable probe box to measure what is really visible",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "vendor": "custom",
   "loggingId": "OAA7",
   "iconGlyph": "live_data",

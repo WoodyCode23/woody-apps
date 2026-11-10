@@ -19,7 +19,7 @@ const { UpdaterClient } = require('./updater_client');
 const M = require('./model');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '0.2.0';
+const APP_ID = 'woodr_store', VERSION = '0.2.1';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
