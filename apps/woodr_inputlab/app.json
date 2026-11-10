@@ -1,0 +1,72 @@
+{
+  "id": "woodr_inputlab",
+  "title": "Input Lab",
+  "description": "Shows which steering-wheel, stalk, console and gesture inputs the head unit sees, live, so apps can use them. Listens only: nothing is sent to the car.",
+  "version": "0.1.0",
+  "vendor": "custom",
+  "loggingId": "OAAB",
+  "iconGlyph": "live_data",
+  "mguHmi": ["ID7"],
+  "signals": {
+    "de.bmw.infotainment.controlelements.SteeringWheelPushButton": {
+      "_optional": "the steering-wheel buttons",
+      "operationSteerWheelFAV": "rs",
+      "operationSteerWheelFC": "rs",
+      "statusAudioVolumeButton": "rs",
+      "statusPTTButton1": "rs",
+      "statusRotaryPress": "rs",
+      "statusRotarySteps": "rs",
+      "statusSearchSwitch1": "rs",
+      "statusSpecialFunctionButton": "rs",
+      "statusSpecialFunctionButton2": "rs",
+      "statusSteerWheelFCLED": "rs",
+      "statusTelephoneButton": "rs"
+    },
+    "de.bmw.body.Light": {
+      "_optional": "the left stalk (indicator, main beam, high-beam assistant button)",
+      "IndicatorSteeringColumn": "rs",
+      "IndicatorSteeringColumnComplete": "rs"
+    },
+    "de.bmw.infotainment.controlelements.FrontCCU": {
+      "_optional": "the iDrive controller",
+      "statusPushButtonsState": "rs",
+      "statusRotaryEncoderState": "rs"
+    },
+    "de.bmw.infotainment.controlelements.CenterStack": {
+      "_optional": "the centre-stack buttons",
+      "statusAudioVolumeButtonCS": "rs",
+      "statusFunctionalBookmarkButtons": "rs",
+      "statusPushButtonAmFmTP": "rs",
+      "statusPushButtonAudio": "rs",
+      "statusPushButtonEject": "rs",
+      "statusPushButtonMode": "rs",
+      "statusPushButtonSkip": "rs"
+    },
+    "de.bmw.infotainment.controlelements.MyCarButton": {
+      "_optional": "the mode / My Car buttons",
+      "operationModeButtons": "rs",
+      "operationMyCarButton": "rs",
+      "_broadcasts": ["displayDassComfortSettingsMenu"]
+    },
+    "de.bmw.infotainment.controllerelements.gesture.GestureRecognition": {
+      "_optional": "gesture control",
+      "activations": "rs",
+      "cameraStatus": "rs",
+      "_broadcasts": ["gestures"]
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Input Lab",
+      "buttons": [
+        ["BTN_ACTION", "Clear"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "showRotary", "label": "Show controller and roller turns", "type": "bool", "default": true}
+  ]
+}
