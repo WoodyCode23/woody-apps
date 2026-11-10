@@ -1,8 +1,8 @@
 {
   "id": "woodr_hud",
   "title": "Woody HUD",
-  "description": "A menu on the head-up display worked by the left stalk's high-beam-assistant button (double-tap to open, double-tap to pick), and shift lights as a border round the Waze map. Hide or show Warm-Up HUD, resize the Waze map, step the ambient colour.",
-  "version": "0.1.1",
+  "description": "A menu on the head-up display worked from the steering wheel (the menu button opens and picks, the right roller moves), and shift lights as a border round the Waze map. Hide or show Warm-Up HUD, resize the Waze map, step the ambient colour.",
+  "version": "0.2.0",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",
@@ -14,9 +14,10 @@
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs"
     },
-    "de.bmw.body.Light": {
-      "_optional": "the high-beam-assistant button that works the menu",
-      "IndicatorSteeringColumnComplete": "s"
+    "de.bmw.infotainment.controlelements.SteeringWheelPushButton": {
+      "_optional": "the wheel's menu button and right roller that work the HUD menu",
+      "statusSpecialFunctionButton": "rs",
+      "statusRotarySteps": "rs"
     }
   },
   "screens": [
@@ -39,7 +40,7 @@
   "settings": [
     {
       "key": "menu",
-      "label": "Double-tap opens the HUD menu",
+      "label": "The wheel's menu button opens the HUD menu",
       "type": "bool",
       "default": true
     },

@@ -56,7 +56,7 @@ async function background(bg) {
     }
 
     const taps = new Taps(bg, (n) => {
-        if (settings.get('taps') === false) return;
+        if (settings.get('taps') !== true) return;
         st.lastTap = { n: n, at: Date.now() };
         if (n === 4) nextColour();                  /* 2 taps belong to Warm-Up HUD (hide / show) */
         else if (n === 6) { st.revOn = !st.revOn; settings.set('revFollow', st.revOn); light.flash(); }

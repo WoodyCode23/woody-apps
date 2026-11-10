@@ -51,7 +51,7 @@ async function background(bg) {
      * the assistant back where it was, so the car's own function is untouched. */
     /* Woody HUD's menu, when it runs, owns the double-tap: its choice comes through /dev/shm/woody/hud.json */
     const woodyHud = () => !!shared.read('hud.json', 0);
-    const taps = new Taps(bg, (n) => { if (n === 2 && bg.settings.get('taps') !== false && !woodyHud()) { hud.toggle(); tick(); } });
+    const taps = new Taps(bg, (n) => { if (n === 2 && bg.settings.get('taps') === true && !woodyHud()) { hud.toggle(); tick(); } });
     let menuSeen = null;
     const followMenu = () => {
         const s = shared.read('hud.json');

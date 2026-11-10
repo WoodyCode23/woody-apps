@@ -18,7 +18,7 @@ const mgu = require('./kit/mgu');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
 const { Canvas, withAlpha } = require('./kit/canvas');
-const { Taps } = require('./taps');
+const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
 const shared = require('./shared');
 
@@ -27,7 +27,7 @@ try { ClusterRender = require('./cluster_render_client').ClusterRender; } catch 
 
 const W = 1600, H = 520;
 const APP_ID = 'woodr_hud';
-const STEP_MS = 1300;
+const IDLE_MS = 10000;                 /* the menu closes this long after the last button or roll */
 const SLOT = { x: 220, y: 185, w: 470, h: 133 };            /* clear of BMW's HUD content in every view (Screen Lab) */
 const MENU = { x: 260, y: 150, w: 390, h: 190 };
 const COLOURS = { green: '#2fd27a', yellow: '#ffd34d', red: '#ff2a2a' };
@@ -101,23 +101,28 @@ async function background(bg) {
         else if (key === 'ambient') { const a = shared.read('ambient.json') || {}; shared.write('ambient.json', { cmd: 'next', n: (a.n || 0) + 1 }); }
     }
 
-    const taps = new Taps(bg, (n) => {
-        if (n !== 2 || settings.get('menu') === false) return;
-        if (!st.menuOpen) { st.menuOpen = true; st.at = 0; st.openedAt = Date.now(); showMenu(); return; }
-        const it = items()[st.at];
-        closeMenu();
-        if (it && it.key !== 'close') pick(it.key);
+    /* the wheel: the menu button opens (BMW's list opens with it) and picks; the right roller moves the highlight */
+    const wheel = new Wheel(bg, {
+        onMenu: () => {
+            if (settings.get('menu') === false) return;
+            if (!st.menuOpen) { st.menuOpen = true; st.at = 0; st.touched = Date.now(); showMenu(); log.info('menu: open'); return; }
+            const it = items()[st.at];
+            closeMenu();
+            if (it && it.key !== 'close') pick(it.key);
+        },
+        onRoll: (d) => {
+            if (!st.menuOpen) return;
+            const n = items().length;
+            st.at = ((st.at + (d > 0 ? 1 : -1)) % n + n) % n;
+            st.touched = Date.now();
+            showMenu();
+        },
     });
-    await taps.start();
+    await wheel.start();
 
     const menuTimer = setInterval(() => {
-        if (!st.menuOpen) return;
-        const n = items().length;
-        const steps = Math.floor((Date.now() - st.openedAt) / STEP_MS);
-        if (steps >= n + 1) { closeMenu(); return; }             /* one full round and a bit: nobody wanted it */
-        const at = steps % n;
-        if (at !== st.at) { st.at = at; showMenu(); }
-    }, 100);
+        if (st.menuOpen && Date.now() - (st.touched || 0) > IDLE_MS) { closeMenu(); log.info('menu: closed (idle)'); }
+    }, 500);
 
     /* ---------- shift lights ---------- */
     function stageOf(rpm) {
@@ -169,7 +174,7 @@ async function background(bg) {
     const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 4000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
-    process.on('exit', () => { [menuTimer, shiftTimer, wazeTimer].forEach(clearInterval); taps.stop(); closeMenu(); hideFrame(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
+    process.on('exit', () => { [menuTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
     return { st: st, items: items, waze: waze, pick: pick };
 }
 
@@ -182,8 +187,8 @@ mgu.run({
             const t = ctx.theme();
             const cv = ctx.canvas(W, H).clear(t.bg);
             G.panel(cv, t, 24, 44, 760, 468, 'HUD menu');
-            ['Double-tap the high-beam-assistant button (left stalk end):', 'the menu opens on the HUD and steps by itself.',
-                'Double-tap again to pick the highlighted item.', '', 'Even tap counts only: the assistant ends where it was.']
+            ['Press the menu button on the wheel (three lines, right side):', 'our menu opens on the HUD over BMW\'s list.',
+                'Roll the right roller to move, press the menu button again to pick.', '', 'It closes by itself after 10 s.']
                 .forEach((l, i) => cv.text(l, 48, 112 + i * 34, 21, i < 3 ? t.text : t.dim));
             bgm.items().forEach((it, i) => {
                 const y = 300 + i * 40;
