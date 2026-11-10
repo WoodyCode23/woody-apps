@@ -124,6 +124,17 @@ const PICS = {
         c.roundRect(44, 82, 52, 9, 3, RED);
         c.fillRect(46, 96, 40, 6, withAlpha(WHITE, 0.55));
     },
+    /* Woody Dashcam: a camera body and lens, a red REC dot, a loop arrow */
+    woodr_dashcam(c) {
+        c.roundRect(32, 64, 64, 44, 8, WHITE);
+        c.triangle([[96, 78], [116, 66], [116, 106]], WHITE);
+        c.triangle([[96, 94], [116, 66], [116, 106]], WHITE);
+        c.circle(56, 86, 14, '#000000');
+        c.circle(56, 86, 9, withAlpha(WHITE, 0.6));
+        c.circle(84, 74, 6, RED);
+        c.circle(84, 74, 10, withAlpha(RED, 0.3));
+        c.arc(64, 118, 18, 22, 100, 300, withAlpha(HOT, 0.8));
+    },
     /* Home Assistant: a house with a lit red door and a signal over it */
     woodr_hass(c) {
         c.triangle([[30, 86], [70, 54], [110, 86]], WHITE);
