@@ -1,0 +1,49 @@
+{
+  "id": "woodr_ambient",
+  "title": "Ambient Studio",
+  "description": "Your ambient light, built on the car's own: tap a colour, boost the brightness past the menu, double-tap the high-beam-assistant button for the next colour, and rev-follow with Redline (red at the warning rpm, full brightness at the shift point).",
+  "version": "0.1.0",
+  "vendor": "custom",
+  "loggingId": "OAAD",
+  "iconGlyph": "live_data",
+  "autostart": true,
+  "mguHmi": ["ID7"],
+  "signals": {
+    "de.bmw.infotainment.misc.ComfortFunctionIuK": {
+      "ambientLightInteriorColour": "w",
+      "statusAmbientLightInteriorColour": "rs"
+    },
+    "de.bmw.body.Light": {
+      "_optional": "the high-beam-assistant button for the stalk taps",
+      "IndicatorSteeringColumnComplete": "s"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Ambient Studio",
+      "buttons": [
+        ["BTN_ACTION", "Next colour"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "brightness", "label": "Brightness", "type": "choice", "default": "menu",
+     "options": [["menu", "Menu setting"], ["boost", "Boost"], ["max", "Max (brighter than the menu)"]]},
+    {"key": "cycle", "label": "Double-tap cycles through", "type": "choice", "default": "rgb",
+     "options": [["rgb", "Your colour, red, green, blue, pink"], ["red", "Your colour and red"], ["all", "All 12"]]},
+    {"key": "taps", "label": "High-beam-assistant button taps", "type": "bool", "default": true},
+    {"key": "revFollow", "label": "Rev-follow", "type": "bool", "default": false},
+    {"key": "revRedlineOnly", "label": "Rev-follow only while Redline is on", "type": "bool", "default": true},
+    {"key": "warnRpm", "label": "Red from", "type": "number", "unit": "rpm", "default": 5500, "min": 3000, "max": 7000, "step": 100},
+    {"key": "shiftRpm", "label": "Full brightness from", "type": "number", "unit": "rpm", "default": 6800, "min": 3500, "max": 7300, "step": 100}
+  ]
+}

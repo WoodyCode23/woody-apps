@@ -105,6 +105,17 @@ const PICS = {
         [40, 70, 100].forEach((x) => { c.circle(x, 70 + Math.sin((x - 26) / 88 * Math.PI) * -8, 4, WHITE); });
         c.fillRect(30, 118, 80, 4, withAlpha(WHITE, 0.25));
     },
+    /* Ambient Studio: a palette of the car's colours around a lit centre */
+    woodr_ambient(c) {
+        const cols = ['#e1001a', '#2fd27a', '#2a6cff', '#ff4dc4', '#ff8a1a', '#ffffff'];
+        cols.forEach((col, k) => {
+            const [x, y] = pt(70, 90, 28, k * 60);
+            c.circle(x, y, 12, withAlpha(col, 0.25));
+            c.circle(x, y, 8, col);
+        });
+        c.circle(70, 90, 10, withAlpha(WHITE, 0.2));
+        c.circle(70, 90, 6, WHITE);
+    },
     /* Home Assistant: a house with a lit red door and a signal over it */
     woodr_hass(c) {
         c.triangle([[30, 86], [70, 54], [110, 86]], WHITE);
