@@ -20,7 +20,7 @@ const M = require('./model');
 const { Progress } = require('./progress');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '0.3.1';
+const APP_ID = 'woodr_store', VERSION = '0.4.0';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
@@ -49,6 +49,7 @@ mgu.run({
         let sel = 0, scrollY = 0, armed = null, armedAt = 0;
         let open = null;                   /* the developer folder shown, or null for the folder list */
         let rebootArmedAt = 0;
+        let allArmedAt = 0;                /* update all: first press arms, a second within 5 s queues them */
         const progress = new Progress();             /* restart: first press arms, a second within 5 s restarts */
         const t0 = Date.now();
 
@@ -82,10 +83,24 @@ mgu.run({
         const selectedRow = () => listRows()[sel] || null;
         const selected = () => { const r = selectedRow(); return r && r.item ? r.item : null; };
 
+        function updateAll(row) {
+            if (demo) { note = 'Preview: nothing installed'; noteAt = Date.now(); return; }
+            if (Date.now() - allArmedAt > 5000) { allArmedAt = Date.now(); note = 'Press again to update ' + row.updateAll.length + ' apps'; noteAt = Date.now(); return; }
+            allArmedAt = 0;
+            let n = 0;
+            /* the updater queues them and runs one at a time */
+            row.updateAll.forEach((c) => { if (client.install(c.id)) { M.markSent(c.id); n++; } });
+            note = 'Queued ' + n + ' update' + (n === 1 ? '' : 's'); noteAt = Date.now();
+        }
+
         /* into a folder, or back out to the list of folders (the cursor lands on the folder left) */
         function enter(row) {
             if (!row) return;
-            if (row.folder) { open = row.folder.dev; sel = row.folder.items.length ? 1 : 0; scrollY = 0; armed = null; return; }
+            if (row.updateAll) { updateAll(row); return; }
+            if (row.folder) {
+                open = row.folder.dev; scrollY = 0; armed = null;
+                const r = listRows(); sel = Math.max(0, r.findIndex((x) => x.item)); return;
+            }
             if (row.back) {
                 const left = open;
                 open = null; scrollY = 0; armed = null;
@@ -129,6 +144,14 @@ mgu.run({
             r.forEach((row, i) => {
                 const ry = top + ys[i] - scrollY;
                 if (ry > bottom || ry + ROW < top) return;
+                if (row.updateAll) {
+                    const on = i === sel, armedNow = Date.now() - allArmedAt < 5000;
+                    cv.roundRect(40, ry + 2, p.w - 32, ROW - 6, 10, withAlpha(armedNow ? ORANGE : AMBER, on ? 0.38 : 0.2));
+                    cv.text(armedNow ? 'Press again to update ' + row.updateAll.length : 'Update all  (' + row.updateAll.length + ')', 60, ry + 36, 24, t.text, { font: 'bold' });
+                    cv.text(row.scope, p.x + p.w - 30, ry + 36, 20, t.dim, { align: 'right' });
+                    if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; updateAll(row); return render(); }, 'ua' + (open || ''), 10);
+                    return;
+                }
                 if (row.folder || row.back) {
                     const g = row.folder || row.back, on = i === sel;
                     if (on) cv.roundRect(40, ry + 2, p.w - 32, ROW - 6, 10, withAlpha(t.accent, 0.18));
@@ -167,6 +190,19 @@ mgu.run({
             G.panel(cv, t, p.x, p.y, p.w, p.h, demo ? 'Details  (PREVIEW - sample data)' : 'Details');
             const c = selected();
             const row = selectedRow();
+            if (!c && row && row.updateAll) {
+                let uy = p.y + 92;
+                cv.text('Update all', p.x + 24, uy, 32, AMBER, { font: 'bold' }); uy += 38;
+                cv.text(row.updateAll.length + ' updates in ' + row.scope + ', installed one after another', p.x + 24, uy, 20, t.text); uy += 36;
+                row.updateAll.slice(0, 9).forEach((u) => {
+                    cv.text(u.title || u.id, p.x + 24, uy, 20, t.text);
+                    cv.text((u.installed || '?') + ' > ' + u.version, p.x + p.w - 24, uy, 18, t.dim, { align: 'right' });
+                    uy += 28;
+                });
+                if (row.updateAll.length > 9) cv.text('+ ' + (row.updateAll.length - 9) + ' more', p.x + 24, uy, 18, t.dim);
+                cv.text('Press twice to queue them all', p.x + 24, p.y + p.h - 40, 20, t.dim);
+                return;
+            }
             if (!c && row && (row.folder || row.back)) {
                 /* a folder: who it is and where its apps come from */
                 const g = row.folder || row.back;
@@ -265,7 +301,7 @@ mgu.run({
         }
 
         ctx.onScroll((dy) => { const before = sel; move(dy > 0 ? 1 : -1); render().catch(() => {}); return before !== sel; });
-        ui.onClick('BTN_ACTION', () => { const row = selectedRow(); if (row && (row.folder || row.back)) enter(row); else act(selected()); return render(); });
+        ui.onClick('BTN_ACTION', () => { const row = selectedRow(); if (row && (row.folder || row.back || row.updateAll)) enter(row); else act(selected()); return render(); });
         ui.onClick('BTN_PAGE', () => { move(1); return render(); });
         ui.onClick('BTN_PREV', () => { move(-1); return render(); });
         ui.onClick('BTN_RESTART', () => { restart(); return render(); });

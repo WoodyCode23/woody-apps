@@ -67,8 +67,14 @@ function group(state) {
  */
 function rows(groups, open) {
     const g = open ? groups.filter((x) => x.dev === open)[0] : null;
-    if (!g) return groups.map((x) => ({ folder: x }));
-    return [{ back: g }].concat(g.items.map((c) => ({ item: c, dev: g.dev })));
+    const updatable = (items) => items.filter((c) => c.status === 'update' && c.act && c.act.can);
+    if (!g) {
+        const all = updatable([].concat.apply([], groups.map((x) => x.items)));
+        return (all.length ? [{ updateAll: all, scope: 'everything' }] : []).concat(groups.map((x) => ({ folder: x })));
+    }
+    const mine = updatable(g.items);
+    return [{ back: g }].concat(mine.length ? [{ updateAll: mine, scope: g.mine ? 'my apps' : g.dev }] : [])
+        .concat(g.items.map((c) => ({ item: c, dev: g.dev })));
 }
 
 /* a believable state for the desktop preview, where there is no updater */
@@ -86,7 +92,7 @@ const DEMO = {
         { id: 'woodr_screenlab', kind: 'app', title: 'Screen Lab', version: '0.2.1', installed: '0.2.1', status: 'installed', source: 'woody-apps', compat: 'yes', description: 'Calibration grids for the HUD and cluster.', requiredAlone: [] },
         { id: 'woodr_hass', kind: 'app', title: 'Home Assistant', version: '0.1.0', installed: null, status: 'available', source: 'woody-apps', compat: 'yes', description: 'Home Assistant dashboard and car-to-HA push.', requiredAlone: [] },
         { id: 'woodr_ambientlab', kind: 'app', title: 'Ambient Lab', version: '0.1.0', installed: null, status: 'available', source: 'woody-apps', compat: 'yes', queued: true, description: 'What does the ambient light accept?', requiredAlone: [] },
-        { id: 'redline', kind: 'app', title: 'Redline', version: '1.16.8', installed: '1.16.8', status: 'installed', source: 'idrive7-apps', compat: 'yes', description: 'Rev tach with shift lights and a HUD.', requiredAlone: [] },
+        { id: 'redline', kind: 'app', title: 'Redline', version: '1.16.9', installed: '1.16.8', status: 'update', source: 'idrive7-apps', compat: 'yes', description: 'Rev tach with shift lights and a HUD.', requiredAlone: [] },
         { id: 'idrive7-renderd', kind: 'tool', title: 'GPU renderer', version: '2.1.7', installed: '2.1.7', status: 'installed', source: 'idrive7-apps', compat: 'yes', description: 'The apps\' own GPU renderer.', provides: 'renderer', requiredAlone: [] },
         { id: 'robertn_waze_cluster', kind: 'app', title: 'Waze on cluster', version: '0.6.4', installed: null, status: 'available', source: 'idrive-apps', compat: 'yes', description: 'CarPlay or Android Auto map on the cluster and HUD.', requiredAlone: ['waze-on-cluster'] },
     ],
