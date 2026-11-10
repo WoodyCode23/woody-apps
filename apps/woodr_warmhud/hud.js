@@ -217,7 +217,11 @@ class WarmHud {
     update(d) {
         if (!this.cr) return null;
         const set = this.ctx.settings;
-        const on = set.get('hud') !== false;
+        /* "fully on": the engine running, or ran in the last ENGINE_HOLD_MS (auto start/stop at a light), or
+         * the car moving. Ignition alone (engine off) shows nothing. */
+        if (typeof d.engineOn === 'boolean') this.engineOn = d.engineOn;      /* callers without it keep the last state */
+        const running = this.engineOn === true || (typeof d.speed === 'number' && d.speed > 1);
+        const on = set.get('hud') !== false && (set.get('engineOnly') === false || running);
         const o = {
             readyAt: Number(set.get('readyAt')) || 90,
             transReady: Number(set.get('transReady')) || 70,

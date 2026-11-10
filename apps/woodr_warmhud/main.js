@@ -14,6 +14,7 @@ const { Tyres } = require('./tyres');
 
 const W = 1600, H = 520;
 const APP_ID = 'woodr_warmhud';
+const ENGINE_HOLD_MS = 120000;     /* auto start/stop: the engine may rest this long at a light and still count as on */
 
 async function background(bg) {
     const gearbox = new GearboxTemp(bg);
@@ -40,7 +41,7 @@ async function background(bg) {
             const want = wantGearbox();
             if (want && !polling) { gearbox.start(); polling = true; bg.log.info('gearbox: polling (engine running)'); }
             else if (!want && polling) { gearbox.stop(); polling = false; bg.log.info('gearbox: stopped'); }
-            hud.update(Object.assign({}, car.live, { trans: gearbox.value(), tyres: tyres.snapshot() }));
+            hud.update(Object.assign({}, car.live, { trans: gearbox.value(), tyres: tyres.snapshot(), engineOn: rpmSeen > 0 && Date.now() - rpmSeen < ENGINE_HOLD_MS }));
         } catch (e) { bg.log.warn('hud tick: ' + e); }
     };
     const timer = setInterval(tick, 1000);
