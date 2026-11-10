@@ -2,7 +2,7 @@
   "id": "woodr_hass",
   "title": "Home Assistant",
   "description": "Home Assistant on the centre screen: entity tiles, service buttons, car state pushed to HA, and the front doorbell camera on the instrument cluster",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "vendor": "custom",
   "loggingId": "OAA8",
   "iconGlyph": "live_data",
@@ -18,12 +18,12 @@
     },
     "de.bmw.infrastructure.VehicleCondition": {
       "_optional": "ignition / drive-ready state, for the doorbell safety gate and HA presence",
-      "VehicleCondition": "rs"
+      "VehicleCondition": "s"
     },
     "de.bmw.infrastructure.VehicleInformation": {
       "_optional": "selector position P/R/N/D, for the doorbell safety gate",
-      "statusGearboxDrive": "rs",
-      "DataPowerTrain2": "rs"
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
     }
   },
   "screens": [

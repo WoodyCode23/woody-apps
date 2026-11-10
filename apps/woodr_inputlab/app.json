@@ -2,7 +2,7 @@
   "id": "woodr_inputlab",
   "title": "Input Lab",
   "description": "Shows which steering-wheel, stalk, console and gesture inputs the head unit sees, live, so apps can use them. Listens only: nothing is sent to the car.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "vendor": "custom",
   "loggingId": "OAAB",
   "iconGlyph": "live_data",
@@ -24,8 +24,8 @@
     },
     "de.bmw.body.Light": {
       "_optional": "the left stalk (indicator, main beam, high-beam assistant button)",
-      "IndicatorSteeringColumn": "rs",
-      "IndicatorSteeringColumnComplete": "rs"
+      "IndicatorSteeringColumn": "s",
+      "IndicatorSteeringColumnComplete": "s"
     },
     "de.bmw.infotainment.controlelements.FrontCCU": {
       "_optional": "the iDrive controller",
@@ -44,8 +44,8 @@
     },
     "de.bmw.infotainment.controlelements.MyCarButton": {
       "_optional": "the mode / My Car buttons",
-      "operationModeButtons": "rs",
-      "operationMyCarButton": "rs",
+      "operationModeButtons": "s",
+      "operationMyCarButton": "s",
       "_broadcasts": ["displayDassComfortSettingsMenu"]
     },
     "de.bmw.infotainment.controllerelements.gesture.GestureRecognition": {
