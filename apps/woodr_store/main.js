@@ -23,7 +23,7 @@ const CAR = '__car';                  /* the "Wi-Fi, sources, restart" page, ope
 const { Progress } = require('./progress');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '1.0.0';
+const APP_ID = 'woodr_store', VERSION = '1.0.1';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 

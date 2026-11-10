@@ -47,9 +47,16 @@ function rows(s) {
     out.push({ label: 'Phone over USB (tethering)', value: up.usbPhone && up.usbPhone.on ? 'ON' : 'off', colour: up.usbPhone && up.usbPhone.on ? GREEN : '#9a9a9a',
         act: { op: 'usb-phone', on: !(up.usbPhone && up.usbPhone.on) }, key: 'usb', info: 'Use a phone tethered over USB as the car\'s internet when there is no Wi-Fi.' });
 
+    out.push({ header: 'USB' });
+    const sticks = (s.sources || []).filter((src) => src.type === 'usb' || src.usb === true);
+    if (!sticks.length) out.push({ label: 'No USB stick with apps', value: '', colour: '#9a9a9a', act: null, key: 'usbnone',
+        info: 'Put .mgu / .tgz app packages (or a repo folder) on a stick and plug it into the USB port: its apps appear as a "USB" folder.' });
+    sticks.forEach((src) => out.push({ label: 'USB · ' + (src.label || src.id), value: (src.components || 0) + ' apps · ' + (src.status || ''),
+        colour: src.status === 'ok' ? '#2fd27a' : '#ffd34d', act: null, key: 'usb' + src.id, info: 'Its apps are in the "USB · ' + (src.label || src.id) + '" folder.' }));
+
     out.push({ header: 'Sources' });
     const have = {};
-    (s.sources || []).forEach((src) => {
+    (s.sources || []).filter((src) => !(src.type === 'usb' || src.usb === true)).forEach((src) => {
         have[(src.label || '').toLowerCase()] = true;
         out.push({ label: src.label || src.id, value: (src.channel || '') + ' · ' + (src.status || '') + (src.components ? ' · ' + src.components : ''),
             colour: src.status === 'ok' ? GREEN : AMBER, act: src.builtin ? null : { op: 'source-remove', id: src.id }, confirm: true, key: 'src' + src.id,

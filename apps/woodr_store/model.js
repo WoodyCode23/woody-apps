@@ -9,6 +9,8 @@ const MY_OWNER = 'WoodyCode23';          /* every repo of this owner (the new on
 /** the developer a source belongs to: its owner on GitHub, else its label */
 function developerOf(src) {
     if (!src) return 'Other';
+    /* a USB stick the updater found under /media: its own folder, named for the stick */
+    if (src.type === 'usb' || src.usb === true) return 'USB · ' + (src.label || src.id);
     const label = src.label || src.id || '';
     const m = /^([^/]+)\//.exec(label);
     return m ? m[1] : label || 'Other';
@@ -56,7 +58,9 @@ function group(state) {
         g.queued = g.items.filter((c) => c.busy || c.queued || c.sent).length;
         g.installed = g.items.filter((c) => c.installed).length;
     });
-    list.sort((a, b) => (b.mine - a.mine) || a.dev.localeCompare(b.dev));
+    /* yours first, then USB sticks, then everyone else by name */
+    const usbFirst = (g) => (/^USB · /.test(g.dev) ? 1 : 0);
+    list.sort((a, b) => (b.mine - a.mine) || (usbFirst(b) - usbFirst(a)) || a.dev.localeCompare(b.dev));
     return list;
 }
 
