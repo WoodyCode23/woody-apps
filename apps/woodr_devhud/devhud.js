@@ -12,6 +12,8 @@
  * BMW's own content in every view (measured on this car with Screen Lab). A picture, never a shader.
  */
 const { Canvas, withAlpha } = require('./kit/canvas');
+const { Progress } = require('./progress');
+const progress = new Progress();
 const { HudClaim } = require('./kit/hud_claim');
 
 let ClusterRender = null;
@@ -31,11 +33,12 @@ function rows(s) {
     const out = [];
     let active = false;
     const up = s.updater;
+    if (!(up && up.busy)) progress.of(null);
     if (up && up.busy) {
         active = true;
-        const b = up.busy, frac = num(b.progress) && num(b.total) && b.total > 0 ? clamp01(b.progress / b.total) : null;
+        const b = up.busy, pr = progress.of(b);
         const name = String(b.id || '?').replace(/^woodr_|^robertn_/, '');
-        out.push({ label: 'Store', text: frac !== null ? name.slice(0, 9) + ' ' + Math.round(frac * 100) + '%' : name + ' ' + (b.phase || 'busy'), frac: frac, colour: AMBER });
+        out.push({ label: 'Store', text: name.slice(0, 9) + ' ' + Math.round(pr.frac * 100) + '%', frac: pr.frac, colour: AMBER });
     } else if (up && up.catalog && up.catalog.checking) {
         active = true;
         out.push({ label: 'Store', text: 'checking sources', frac: null, colour: AMBER });

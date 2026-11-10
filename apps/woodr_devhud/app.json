@@ -2,12 +2,14 @@
   "id": "woodr_devhud",
   "title": "Dev HUD",
   "description": "Progress bars on the head-up display while you work on the car: Store installs, the battery's charge, the network, and any bar pushed from the laptop. Hidden while driving. Read-only.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "vendor": "custom",
   "loggingId": "OAAC",
   "iconGlyph": "live_data",
   "autostart": true,
-  "mguHmi": ["ID7"],
+  "mguHmi": [
+    "ID7"
+  ],
   "signals": {
     "de.bmw.infotainment.vehicle.CDS": {
       "_optional": "the battery's state of charge",
@@ -23,13 +25,39 @@
       "kind": "canvas",
       "title": "Dev HUD",
       "buttons": [
-        ["BTN_ACTION", "Always / when busy"],
-        ["BTN_SETTINGS", "Settings"]
+        [
+          "BTN_ACTION",
+          "Always / when busy"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
       ]
     }
   ],
   "settings": [
-    {"key": "hud", "label": "Show on the head-up display", "type": "bool", "default": true},
-    {"key": "mode", "label": "When", "type": "choice", "options": [["busy", "When something is happening"], ["always", "Always (parked)"]], "default": "busy"}
+    {
+      "key": "hud",
+      "label": "Show on the head-up display",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "mode",
+      "label": "When",
+      "type": "choice",
+      "options": [
+        [
+          "busy",
+          "When something is happening"
+        ],
+        [
+          "always",
+          "Always (parked)"
+        ]
+      ],
+      "default": "busy"
+    }
   ]
 }

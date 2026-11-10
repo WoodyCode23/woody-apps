@@ -65,6 +65,7 @@ class UpdaterClient extends EventEmitter {
 
     /* anyone */
     check() { return this._write({ op: 'check' }); }
+    status() { return this._write({ op: 'status' }); }
     install(id) { return this._write({ op: 'install', id: id }); }
 
     /* privileged: only work once this app holds the secret */

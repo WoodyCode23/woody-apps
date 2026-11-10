@@ -17,7 +17,7 @@ const { UpdaterClient } = require('./updater_client');
 const { DevHud, rows, draw, IW, IH } = require('./devhud');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_devhud', VERSION = '0.1.1';
+const APP_ID = 'woodr_devhud', VERSION = '0.1.2';
 const LEASE = '/run/mgu-uplink/lease.json';
 const FEED_FRESH_MS = 60000;
 const MOVING_KMH = 5;
@@ -37,6 +37,9 @@ async function background(bg) {
     up.on('state', (s) => { st.updater = s; tick(); });
     up.on('down', () => { st.updater = null; });
     up.connect();
+    /* the updater's pushes can be sparse: ask while a job runs, so the bar moves */
+    const poll = setInterval(() => { if (st.updater && st.updater.busy) up._write({ op: 'status' }); }, 3000);
+    if (poll.unref) poll.unref();
 
     const readLease = () => {
         try { const l = JSON.parse(fs.readFileSync(LEASE, 'utf8')); st.net = l.interface ? l.interface + ' ' + (l.ip || '') : null; } catch (e) { st.net = null; }

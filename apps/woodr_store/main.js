@@ -17,9 +17,10 @@ const G = require('./kit/gauges');
 const { withAlpha } = require('./kit/canvas');
 const { UpdaterClient } = require('./updater_client');
 const M = require('./model');
+const { Progress } = require('./progress');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '0.3.0';
+const APP_ID = 'woodr_store', VERSION = '0.3.1';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
@@ -47,7 +48,8 @@ mgu.run({
         let state = null, live = false, demo = false, note = '', noteAt = 0;
         let sel = 0, scrollY = 0, armed = null, armedAt = 0;
         let open = null;                   /* the developer folder shown, or null for the folder list */
-        let rebootArmedAt = 0;             /* restart: first press arms, a second within 5 s restarts */
+        let rebootArmedAt = 0;
+        const progress = new Progress();             /* restart: first press arms, a second within 5 s restarts */
         const t0 = Date.now();
 
         const client = new UpdaterClient({ hello: { id: APP_ID, version: VERSION } });
@@ -62,7 +64,14 @@ mgu.run({
         };
         readSecret();
         const secretTimer = setInterval(readSecret, 30000);
-        process.on('exit', () => { clearInterval(secretTimer); client.close(); });
+        let lastPoll = 0;
+        const poll = setInterval(() => {
+            const s = state || {};
+            const active = !!s.busy || !!(s.catalog && s.catalog.checking) || Object.keys(s).length === 0;
+            if (Date.now() - lastPoll >= (active ? 3000 : 15000)) { lastPoll = Date.now(); client.status(); }
+            if (active) render().catch(() => {});
+        }, 1000);
+        process.on('exit', () => { clearInterval(secretTimer); clearInterval(poll); client.close(); });
 
         const current = () => {
             /* the desktop preview has no updater: show a sample after 3 s, clearly marked */
@@ -137,10 +146,16 @@ mgu.run({
                 const c = row.item, on = i === sel;
                 if (on) cv.roundRect(40, ry + 2, p.w - 32, ROW - 6, 10, withAlpha(t.accent, 0.18));
                 cv.text(c.title || c.id, 60, ry + 26, 24, t.text, { font: on ? 'bold' : undefined });
-                cv.text((c.kind === 'tool' ? 'tool · ' : '') + (c.installed ? c.installed + (c.status === 'update' ? ' > ' + c.version : '') : c.version), 60, ry + 48, 18, t.dim);
+                if (!c.busy) cv.text((c.kind === 'tool' ? 'tool · ' : '') + (c.installed ? c.installed + (c.status === 'update' ? ' > ' + c.version : '') : c.version), 60, ry + 48, 18, t.dim);
                 const col = c.busy || c.act.label === 'Queued' ? AMBER : c.error ? ORANGE : c.act.op ? (c.status === 'update' ? AMBER : GREEN) : t.dim;
-                const label = c.busy ? (c.busy.phase || 'busy') + (c.busy.total ? ' ' + Math.round(100 * (c.busy.progress || 0) / c.busy.total) + '%' : '') : c.act.label;
+                const pr = c.busy ? progress.of(c.busy) : null;
+                const label = pr ? pr.label : c.act.label;
                 cv.text(label, p.x + p.w - 30, ry + 36, 20, col, { font: 'bold', align: 'right' });
+                if (pr) {
+                    /* a real bar under the row */
+                    cv.roundRect(60, ry + 38, p.w - 280, 8, 4, withAlpha(t.text, 0.15));
+                    cv.roundRect(60, ry + 38, Math.max(8, Math.round((p.w - 280) * pr.frac)), 8, 4, AMBER);
+                }
                 if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; armed = null; return render(); }, 'row' + c.id, 10);
             });
             cv.noclip();
@@ -181,7 +196,13 @@ mgu.run({
             kv('Provides', c.provides);
             kv('Brings along', c.requiredAlone, AMBER);
             kv('Problem', c.problem || c.error || c.blocked, ORANGE);
-            if (c.queued || c.sent) kv('Status', c.busy ? 'installing now' : 'queued: it starts when the job before it is done', AMBER);
+            if (c.busy) {
+                const pr = progress.of(c.busy);
+                kv('Status', pr.label, AMBER);
+                cv.roundRect(p.x + 24, y, p.w - 48, 10, 4, withAlpha(t.text, 0.15));
+                cv.roundRect(p.x + 24, y, Math.max(10, Math.round((p.w - 48) * pr.frac)), 10, 4, AMBER);
+                y += 24;
+            } else if (c.queued || c.sent) kv('Status', 'queued: it starts when the job before it is done', AMBER);
             if (c.revision) kv('Built from', String(c.revision).slice(0, 10));
 
             /* the action, pressed twice */
