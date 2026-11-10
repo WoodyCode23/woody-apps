@@ -16,12 +16,18 @@ function developerOf(src) {
 /** what the row should say and offer */
 function action(c) {
     if (c.busy) return { label: 'Working...', can: false };
+    if (c.queued || c.sent) return { label: 'Queued', can: false };
+    if (c.pendingReboot) return { label: 'After restart', can: false };
     if (c.compat === 'no') return { label: 'Not for this car', can: false };
     if (c.blocked) return { label: 'Blocked', can: false };
     if (c.status === 'update') return { label: 'Update', can: true, op: 'install' };
     if (!c.installed) return { label: 'Install', can: true, op: 'install' };
     return { label: 'Installed', can: false };
 }
+
+/* ids pressed here that the updater has not reported queued or busy yet: id -> when */
+const sent = {};
+function markSent(id) { sent[id] = Date.now(); }
 
 function group(state) {
     const sources = {};
@@ -31,16 +37,20 @@ function group(state) {
         const src = sources[c.source];
         const dev = c.source === MINE ? 'Woody' : developerOf(src);
         const g = groups[dev] || (groups[dev] = { dev: dev, mine: c.source === MINE, items: [] });
-        const busy = state.busy && state.busy.id === c.id ? state.busy : null;
-        g.items.push(Object.assign({}, c, { busy: busy, act: null }));
+        /* busy names the id it installs under, which is the row's installAs when two sources share an id */
+        const busy = state.busy && (state.busy.id === c.id || state.busy.id === c.installAs) ? state.busy : null;
+        /* a press counts as queued until the updater says so itself, or for 20 s at most */
+        if (sent[c.id] && (c.queued || busy || Date.now() - sent[c.id] > 20000)) delete sent[c.id];
+        g.items.push(Object.assign({}, c, { busy: busy, sent: !!sent[c.id], act: null }));
     });
     const list = Object.keys(groups).map((k) => groups[k]);
     list.forEach((g) => {
         g.items.forEach((c) => { c.act = action(c); });
         /* updates first, then installed, then the rest; apps before tools */
-        const rank = (c) => (c.status === 'update' ? 0 : c.installed ? 1 : 2) * 10 + (c.kind === 'tool' ? 1 : 0);
+        const rank = (c) => (c.busy || c.queued || c.sent ? -1 : c.status === 'update' ? 0 : c.installed ? 1 : 2) * 10 + (c.kind === 'tool' ? 1 : 0);
         g.items.sort((a, b) => rank(a) - rank(b) || String(a.title || a.id).localeCompare(String(b.title || b.id)));
         g.updates = g.items.filter((c) => c.status === 'update').length;
+        g.queued = g.items.filter((c) => c.busy || c.queued || c.sent).length;
     });
     list.sort((a, b) => (b.mine - a.mine) || a.dev.localeCompare(b.dev));
     return list;
@@ -67,11 +77,11 @@ const DEMO = {
         { id: 'woodr_warmhud', kind: 'app', title: 'Warm-Up HUD', version: '0.6.0', installed: '0.5.0', status: 'update', source: 'woody-apps', compat: 'yes', description: 'Warm-up on the head-up display: oil, then the gearbox, then the tyres, then it turns itself off.', requiredAlone: [], provides: null },
         { id: 'woodr_screenlab', kind: 'app', title: 'Screen Lab', version: '0.2.1', installed: '0.2.1', status: 'installed', source: 'woody-apps', compat: 'yes', description: 'Calibration grids for the HUD and cluster.', requiredAlone: [] },
         { id: 'woodr_hass', kind: 'app', title: 'Home Assistant', version: '0.1.0', installed: null, status: 'available', source: 'woody-apps', compat: 'yes', description: 'Home Assistant dashboard and car-to-HA push.', requiredAlone: [] },
-        { id: 'woodr_ambientlab', kind: 'app', title: 'Ambient Lab', version: '0.1.0', installed: null, status: 'available', source: 'woody-apps', compat: 'yes', description: 'What does the ambient light accept?', requiredAlone: [] },
+        { id: 'woodr_ambientlab', kind: 'app', title: 'Ambient Lab', version: '0.1.0', installed: null, status: 'available', source: 'woody-apps', compat: 'yes', queued: true, description: 'What does the ambient light accept?', requiredAlone: [] },
         { id: 'redline', kind: 'app', title: 'Redline', version: '1.16.8', installed: '1.16.8', status: 'installed', source: 'idrive7-apps', compat: 'yes', description: 'Rev tach with shift lights and a HUD.', requiredAlone: [] },
         { id: 'idrive7-renderd', kind: 'tool', title: 'GPU renderer', version: '2.1.7', installed: '2.1.7', status: 'installed', source: 'idrive7-apps', compat: 'yes', description: 'The apps\' own GPU renderer.', provides: 'renderer', requiredAlone: [] },
         { id: 'robertn_waze_cluster', kind: 'app', title: 'Waze on cluster', version: '0.6.4', installed: null, status: 'available', source: 'idrive-apps', compat: 'yes', description: 'CarPlay or Android Auto map on the cluster and HUD.', requiredAlone: ['waze-on-cluster'] },
     ],
 };
 
-module.exports = { group: group, rows: rows, developerOf: developerOf, action: action, DEMO: DEMO, MINE: MINE };
+module.exports = { markSent: markSent, group: group, rows: rows, developerOf: developerOf, action: action, DEMO: DEMO, MINE: MINE };
