@@ -23,7 +23,7 @@ const CAR = '__car';                  /* the "Wi-Fi, sources, restart" page, ope
 const { Progress } = require('./progress');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '1.0.1';
+const APP_ID = 'woodr_store', VERSION = '1.0.2';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
@@ -50,6 +50,8 @@ mgu.run({
         const { ui, settings, log } = ctx;
         let state = null, live = false, demo = false, note = '', noteAt = 0;
         let sel = 0, scrollY = 0, armed = null, armedAt = 0;
+        let followSel = true;              /* keep the selected row in view (buttons) or not (finger / knob scrolling) */
+        let maxScrollNow = 0;
         let open = null;                   /* the developer folder shown, or null for the folder list */
         let rebootArmedAt = 0;
         let allArmedAt = 0;                /* update all: first press arms, a second within 5 s queues them */
@@ -145,7 +147,7 @@ mgu.run({
             const r = listRows(); if (!r.length) return;
             let i = sel;
             i = (i + d + r.length) % r.length;
-            sel = i; armed = null;
+            sel = i; armed = null; followSel = true;
         }
 
         function act(c) {
@@ -169,9 +171,20 @@ mgu.run({
             /* where each row sits, and keep the cursor in view */
             let y = 0; const ys = r.map((row) => { const at = y; y += row.header ? HEAD : ROW; return at; });
             const total = y, maxScroll = Math.max(0, total - viewH);
-            if (ys[sel] < scrollY) scrollY = ys[sel] - (sel > 0 && r[sel - 1].header ? HEAD : 0);
-            if (ys[sel] + ROW > scrollY + viewH) scrollY = ys[sel] + ROW - viewH;
+            if (followSel) {
+                if (ys[sel] < scrollY) scrollY = ys[sel] - (sel > 0 && r[sel - 1].header ? HEAD : 0);
+                if (ys[sel] + ROW > scrollY + viewH) scrollY = ys[sel] + ROW - viewH;
+            }
             scrollY = Math.max(0, Math.min(scrollY, maxScroll));
+            maxScrollNow = maxScroll;
+            /* a real scrolling list for the kit: finger drags and the knob scroll it (onScroll below) */
+            if (maxScroll > 0) {
+                const bh = Math.max(30, Math.round(viewH * viewH / total)), by = top + Math.round((viewH - bh) * scrollY / maxScroll);
+                const bar = { x: p.x + p.w - 12, y: by, w: 6, h: bh };
+                cv.roundRect(bar.x, top, bar.w, viewH, 3, withAlpha(t.text, 0.08));
+                cv.roundRect(bar.x, bar.y, bar.w, bar.h, 3, withAlpha(t.text, 0.4));
+                cv.scroll = { y: top, bar: bar };
+            }
             cv.clip(p.x, top, p.w, viewH);
             r.forEach((row, i) => {
                 const ry = top + ys[i] - scrollY;
@@ -192,7 +205,7 @@ mgu.run({
                         cv.text(x.label, 60, ry + 36, 22, x.act ? t.text : t.dim, { font: on ? 'bold' : undefined });
                         cv.text(armedNow ? 'press again' : x.value || '', p.x + p.w - 30, ry + 36, 20, armedNow ? ORANGE : x.colour || t.dim, { font: 'bold', align: 'right' });
                     }
-                    if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; enter(row); return render(); }, 's' + i + (open || ''), 10);
+                    if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; followSel = false; enter(row); return render(); }, 's' + i + (open || ''), 10);
                     return;
                 }
                 if (row.updateAll) {
@@ -214,7 +227,7 @@ mgu.run({
                         const tags = [g.queued ? g.queued + ' queued' : '', g.updates ? g.updates + (g.updates > 1 ? ' updates' : ' update') : ''].filter((x) => x);
                         cv.text(tags.length ? tags.join('  ·  ') : 'Open  >', p.x + p.w - 30, ry + 36, 20, tags.length ? AMBER : t.dim, { font: 'bold', align: 'right' });
                     }
-                    if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; enter(row); return render(); }, 'f' + i + (open || ''), 10);
+                    if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; followSel = false; enter(row); return render(); }, 'f' + i + (open || ''), 10);
                     return;
                 }
                 const c = row.item, on = i === sel;
@@ -230,7 +243,7 @@ mgu.run({
                     cv.roundRect(60, ry + 38, p.w - 280, 8, 4, withAlpha(t.text, 0.15));
                     cv.roundRect(60, ry + 38, Math.max(8, Math.round((p.w - 280) * pr.frac)), 8, 4, AMBER);
                 }
-                if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; armed = null; return render(); }, 'row' + c.id, 10);
+                if (cv.own) cv.target(40, Math.max(ry, top), p.w - 32, Math.min(ry + ROW - 6, bottom) - Math.max(ry, top), () => { sel = i; armed = null; followSel = false; return render(); }, 'row' + c.id, 10);
             });
             cv.noclip();
         }
@@ -373,7 +386,13 @@ mgu.run({
             await ui.image('MAIN_GFX', cv);
         }
 
-        ctx.onScroll((dy) => { const before = sel; move(dy > 0 ? 1 : -1); render().catch(() => {}); return before !== sel; });
+        ctx.onScroll((dy) => {
+            const before = scrollY;
+            followSel = false;
+            scrollY = Math.max(0, Math.min(scrollY + dy, maxScrollNow));
+            render().catch(() => {});
+            return scrollY !== before;
+        });
         ui.onClick('BTN_ACTION', () => { const row = selectedRow(); if (row && (row.folder || row.back || row.updateAll || row.carEntry || row.setting)) enter(row); else act(selected()); return render(); });
         ui.onClick('BTN_PAGE', () => { move(1); return render(); });
         ui.onClick('BTN_PREV', () => { move(-1); return render(); });
