@@ -44,6 +44,26 @@ const HUE = 'controlHueInteriorLighting';
 const BRI = 'controlBrightnessValueBrightnessOffsetAmbientePanoramicRoofInteriorLighting';
 const L1 = 'controlHueValueLayer1IndividualGroup', L2 = 'controlHueValueLayer2IndividualGroup', L3 = 'controlHueValueLayer3IndividualGroup';
 
+/* the menu field with other fields set alongside it in the same request */
+const MENU = 'controlMenuAmbientePanoramicRoofInteriorLighting';
+function withMenu(menu, extra) { const r = blank(); r[MENU] = menu; Object.assign(r, extra || {}); return r; }
+const IND = 'INDIVIDUALMODUS';       /* menu value 13: the mode the free hue and zone fields belong to */
+
+/* round 2 (after round 1 on 2026-11-10: presets work, free hue / zones alone ignored, brightness 0 dims) */
+const ROUND2 = [
+    { name: 'Individual mode', note: 'Menu value 13 on its own. Does the colour change, or a menu appear?', req: () => withMenu(IND) },
+    { name: 'Individual + hue 0', note: 'Individual mode with a free hue: red?', req: () => withMenu(IND, { [HUE]: 0 }) },
+    { name: 'Individual + hue 1365', note: 'Green?', req: () => withMenu(IND, { [HUE]: 1365 }) },
+    { name: 'Individual + hue 2730', note: 'Blue?', req: () => withMenu(IND, { [HUE]: 2730 }) },
+    { name: 'Individual + 3 zones', note: 'Zone hues 0 / 85 / 170: different colours in different places?', req: () => withMenu(IND, { [L1]: 0, [L2]: 85, [L3]: 170 }) },
+    { name: 'Individual + brightest', note: 'Individual mode with brightness offset 254: brighter than normal?', req: () => withMenu(IND, { [BRI]: 254 }) },
+    { name: 'Follow driving mode', note: 'Menu value 14: colour tied to Comfort / Sport / Sport+. Change mode and watch.', req: () => withMenu('KOPPLUNG_AN_FES') },
+    { name: 'Ambient off', note: 'Menu value 0: lights off (restored after the delay). Basis for a flash.', req: () => withMenu('AMBIENTEBELEUCHTUNG_AUS') },
+];
+/* the 12 presets one by one, to map number -> colour (garage: which is red, which is green?) */
+const TOUR = [];
+for (let n = 1; n <= 12; n++) TOUR.push({ name: 'Preset ' + n, note: 'Write down the colour you see for preset ' + n + '.', req: () => withMenu('FARBAUSWAHL_' + n) });
+
 /* name, what to watch for, request builder (gets the state before the test) */
 const TESTS = [
     { name: 'Restore my colour', note: 'Sends your own preset again. Use any time.', restore: true,
@@ -61,6 +81,8 @@ const TESTS = [
     { name: 'Zone 2 hue 85', note: 'Layer 2.', req: () => withField(L2, 85) },
     { name: 'Zone 3 hue 170', note: 'Layer 3.', req: () => withField(L3, 170) },
 ];
+/* round 2 and the preset tour come right after the baseline (index 1), round 1's dead ends after them */
+TESTS.splice(2, 0, ...ROUND2.concat(TOUR));
 
 /** the request that puts back what the car reported before a test (only fields the status gave us) */
 function restoreFrom(before) {

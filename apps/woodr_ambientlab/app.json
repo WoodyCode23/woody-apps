@@ -2,7 +2,7 @@
   "id": "woodr_ambientlab",
   "title": "Ambient Lab",
   "description": "Find out what your car's ambient lighting accepts: free hue, per-zone colours, brightness. Test writes are off until you allow them, and every test restores itself.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "vendor": "custom",
   "loggingId": "OAA9",
   "iconGlyph": "live_data",
