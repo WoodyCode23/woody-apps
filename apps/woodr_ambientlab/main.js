@@ -13,6 +13,15 @@ const mgu = require('./kit/mgu');
 const G = require('./kit/gauges');
 const { withAlpha } = require('./kit/canvas');
 const Lab = require('./lab');
+const fs = require('fs');
+const path = require('path');
+
+/* what you saw, one tap: general tests, and colours for the preset tour */
+const SAW = [['changed', 'Changed colour'], ['brighter', 'Brighter'], ['dimmer', 'Dimmer'], ['part', 'Part of cabin'], ['off', 'Went off'], ['nothing', 'Nothing']];
+const COLOURS = [['red', 'Red', '#e1001a'], ['orange', 'Orange', '#ff7a1a'], ['yellow', 'Yellow', '#ffd21a'], ['green', 'Green', '#2fd27a'],
+    ['teal', 'Teal', '#1ad2c8'], ['blue', 'Blue', '#2a6cff'], ['purple', 'Purple', '#9a4dff'], ['pink', 'Pink', '#ff4dc4'],
+    ['white', 'White', '#f0f0f0'], ['other', 'Other', '#777777']];
+const isPreset = (t) => /^Preset \d+$/.test(t.name);
 
 const W = 1600, H = 520;
 const LIGHT = 'de.bmw.infotainment.misc.ComfortFunctionIuK';
@@ -22,6 +31,18 @@ mgu.run({
         const { ui, settings, log } = ctx;
         let proxy = null, linkError = null;
         const st = { slot: null, own: null, raw: {}, seen: 0, changedAt: 0 };
+        /* your answers, kept across restarts: test name -> answer */
+        const resultsFile = path.join(ctx.dataDir, 'results.json');
+        let answers = {};
+        try { answers = JSON.parse(fs.readFileSync(resultsFile, 'utf8')) || {}; } catch (e) { answers = {}; }
+        function answer(t, key) {
+            answers[t.name] = key;
+            try { fs.writeFileSync(resultsFile, JSON.stringify(answers, null, 1)); } catch (e) { log.warn('results: ' + e); }
+            log.info('result ' + t.name + ' = ' + key);
+            last = null;
+            idx = Math.min(Lab.TESTS.length - 1, idx + 1);          /* on to the next test */
+            return render();
+        }
         let idx = 1, last = null, before = null, restoreTimer = null, restoreAt = 0, lastWrite = 0, busy = false;
 
         const sub = await ctx.signals.watch(LIGHT, '1', {
@@ -102,12 +123,25 @@ mgu.run({
             cv.text(test.name, 828, 130, 34, t.text, { font: 'bold' });
             cv.text(test.note, 828, 172, 20, t.dim);
             cv.text(allowed() ? 'Writes ALLOWED' : 'Writes off (Settings)', 828, 236, 26, allowed() ? '#ffd34d' : t.dim, { font: 'bold' });
-            if (last) {
+            const given = answers[test.name];
+            if (given) cv.text('Your answer: ' + given, 1552, 236, 22, '#2fd27a', { font: 'bold', align: 'right' });
+            if (last && last.ok && last.name === test.name && last.at) {
+                /* what did you see? one tap records it and moves on */
+                const opts = isPreset(test) ? COLOURS : SAW;
+                const per = isPreset(test) ? 5 : 3, bw = isPreset(test) ? 136 : 236, bh = 52, gap = 10;
+                cv.text('What did you see?', 1552, 290, 22, t.text, { font: 'bold', align: 'right' });
+                opts.forEach((o, k) => {
+                    const x = 828 + (k % per) * (bw + gap), y = 306 + Math.floor(k / per) * (bh + gap);
+                    cv.roundRect(x, y, bw, bh, 10, o[2] ? withAlpha(o[2], 0.55) : withAlpha(t.text, 0.14));
+                    cv.text(o[1], x + bw / 2, y + 34, 21, t.text, { font: 'bold', align: 'center' });
+                    if (cv.own) cv.target(x, y, bw, bh, () => answer(test, o[0]), 'ans' + k, 10);
+                });
+            } else if (last) {
                 cv.text('Last: ' + last.name, 828, 296, 22, t.text);
                 cv.text(last.text, 828, 330, 20, last.ok ? t.dim : t.warn);
                 const v = verdict(); if (v) cv.text(v, 828, 364, 22, /CHANGED/.test(v) ? '#2fd27a' : t.dim, { font: 'bold' });
             }
-            if (restoreAt) cv.text('Restoring your colour in ' + Math.max(0, Math.ceil((restoreAt - Date.now()) / 1000)) + ' s', 828, 430, 22, '#ffd34d');
+            if (restoreAt) cv.text('Restoring your colour in ' + Math.max(0, Math.ceil((restoreAt - Date.now()) / 1000)) + ' s', 828, 268, 20, '#ffd34d');
             /* on-screen controls: some HMI layouts show no page buttons. Touch these, or turn the controller. */
             const btn = (x, w, label, col, key, fn) => {
                 cv.roundRect(x, 450, w, 52, 12, col);
