@@ -57,8 +57,8 @@ async function background(bg) {
     const taps = new Taps(bg, (n) => {
         if (settings.get('taps') === false) return;
         st.lastTap = { n: n, at: Date.now() };
-        if (n === 2) nextColour();
-        else if (n === 4) { st.revOn = !st.revOn; settings.set('revFollow', st.revOn); light.flash(); }
+        if (n === 4) nextColour();                  /* 2 taps belong to Warm-Up HUD (hide / show) */
+        else if (n === 6) { st.revOn = !st.revOn; settings.set('revFollow', st.revOn); light.flash(); }
     });
     await taps.start();
 
@@ -133,11 +133,11 @@ mgu.run({
                 button(cv, t, 988 + i * 192, 100, 180, label, b === k, 'b' + k, () => { settings.set('brightness', k); return render(); }));
             button(cv, t, 988, 172, 276, 'Rev-follow: ' + (st.revOn ? 'ON' : 'off'), st.revOn, 'rev', () => { settings.set('revFollow', !st.revOn); st.revOn = !st.revOn; return render(); });
             button(cv, t, 1276, 172, 276, 'Flash', false, 'flash', () => { light.flash(); return render(); });
-            button(cv, t, 988, 244, 564, 'Next colour (same as double-tap)', false, 'next', () => { bgm.nextColour(); return render(); });
+            button(cv, t, 988, 244, 564, 'Next colour (same as 4 taps)', false, 'next', () => { bgm.nextColour(); return render(); });
 
             let y = 336;
             const line = (k, v, c) => { cv.text(k, 988, y, 19, t.dim); cv.text(v, 1552, y, 19, c || t.text, { align: 'right' }); y += 30; };
-            line('Stalk button', settings.get('taps') === false ? 'off' : '2 taps next colour, 4 taps rev-follow');
+            line('Stalk button', settings.get('taps') === false ? 'off' : '4 taps next colour, 6 taps rev-follow');
             line('Rev-follow', st.revOn ? ['cruising', 'red (warning)', 'red + max (shift)'][st.stage] + (settings.get('revRedlineOnly') === false ? '' : st.redline ? ' · Redline on' : ' · waits for Redline') : 'off');
             line('Warn / shift', (settings.get('warnRpm') || 5500) + ' / ' + (settings.get('shiftRpm') || 6800) + ' rpm');
             if (st.lastTap && Date.now() - st.lastTap.at < 8000) line('Last taps', st.lastTap.n + ' taps', '#2fd27a');

@@ -121,6 +121,8 @@ class WarmHud {
         /* done = warm-up is over for this drive: the HUD stays off until the oil is properly cold again.
          * firstOil = the first real oil reading, to spot a restart of an already-warm engine. */
         this.done = false; this.firstOil = null;
+        /* the driver's double-tap: null = automatic, 'hide' = hidden this drive, 'show' = shown even when warm */
+        this.user = null;
         /* latched phases: oilOk/transOk only drop back on a real fall (5 C under ready) */
         this.oilOk = false; this.transOk = false; this.phase = 'oil';
         this.transWaitSince = 0;            /* when the trans phase began without a reading */
@@ -215,6 +217,14 @@ class WarmHud {
         return 'ready';
     }
 
+    /** double-tap: hide what shows, show what is hidden. Returns the new state. */
+    toggle() {
+        this.user = this.layer ? 'hide' : 'show';
+        this.lastKey = '';
+        this.ctx.log.info('hud: double-tap -> ' + this.user);
+        return this.user;
+    }
+
     update(d) {
         if (!this.cr) return null;
         const set = this.ctx.settings;
@@ -254,7 +264,10 @@ class WarmHud {
         } catch (e) { /* claims live on tmpfs; carry on if unreadable */ }
 
         /* nothing until the first oil reading; nothing once done */
-        if (!on || ph === 'done' || (!num(d.oil) && ph !== 'pressure')) { if (this.layer) this.off(); return st; }
+        /* the driver's double-tap wins over the automatic: hidden, or shown (as 'ready' when the warm-up is done) */
+        if (this.user === 'hide' && ph !== 'pressure') { if (this.layer) this.off(); return st; }
+        if (this.user === 'show' && set.get('hud') !== false) { if (ph === 'done') ph = 'ready'; }
+        else if (!on || ph === 'done' || (!num(d.oil) && ph !== 'pressure')) { if (this.layer) this.off(); return st; }
 
         const r = this._rect();
         if (!this.layer) {

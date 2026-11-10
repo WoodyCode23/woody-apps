@@ -11,6 +11,7 @@ const Car = require('./kit/car');
 const { WarmHud, state, revCeiling } = require('./hud');
 const GearboxTemp = require('./gearbox');
 const { Tyres, shownUnits, presText } = require('./tyres');
+const { Taps } = require('./taps');
 
 const W = 1600, H = 520;
 const APP_ID = 'woodr_warmhud';
@@ -44,11 +45,15 @@ async function background(bg) {
             hud.update(Object.assign({}, car.live, { trans: gearbox.value(), tyres: tyres.snapshot(), units: tyres.units, engineOn: rpmSeen > 0 && Date.now() - rpmSeen < ENGINE_HOLD_MS }));
         } catch (e) { bg.log.warn('hud tick: ' + e); }
     };
+    /* double-tap the high-beam-assistant button (left stalk): hide / show the HUD for this drive. Two taps toggle
+     * the assistant back where it was, so the car's own function is untouched. */
+    const taps = new Taps(bg, (n) => { if (n === 2 && bg.settings.get('taps') !== false) { hud.toggle(); tick(); } });
+    taps.start().catch((e) => bg.log.warn('taps: ' + e));
     const timer = setInterval(tick, 1000);
     if (timer.unref) timer.unref();
     car.onSample(tick);
     bg.settings.onChange(tick);
-    process.on('exit', () => { clearInterval(timer); gearbox.stop(); hud.stop(); });
+    process.on('exit', () => { taps.stop(); clearInterval(timer); gearbox.stop(); hud.stop(); });
     tick();
     return { car: car, hud: hud, gearbox: gearbox, tyres: tyres };
 }
