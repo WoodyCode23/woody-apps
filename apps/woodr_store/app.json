@@ -1,0 +1,27 @@
+{
+  "id": "woodr_store",
+  "title": "Woody Apps",
+  "description": "Your own store for this car: every source grouped by developer, versions, what each app needs, install and update. Runs on mgu-updater and mgu-deploy.",
+  "version": "0.1.0",
+  "vendor": "custom",
+  "loggingId": "OAAA",
+  "iconGlyph": "live_data",
+  "mguHmi": ["ID7"],
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Woody Apps",
+      "buttons": [
+        ["BTN_ACTION", "Install / update"],
+        ["BTN_PAGE", "Next"],
+        ["BTN_PREV", "Previous"],
+        ["BTN_CHECK", "Check for updates"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "showTools", "label": "Show tools as well as apps", "type": "bool", "default": true}
+  ]
+}
