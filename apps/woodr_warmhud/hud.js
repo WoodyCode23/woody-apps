@@ -50,11 +50,42 @@ function revCeiling(oil, readyAt) {
     return 6000;
 }
 
+const CORNER = { FLH: 'FL', FRH: 'FR', RLH: 'RL', RRH: 'RR' };
+
+/** tyre pressure in the chosen unit */
+function pres(bar, unit) { return !num(bar) ? '--' : unit === 'bar' ? bar.toFixed(1) + ' bar' : Math.round(bar * 14.5038) + ' psi'; }
+
+/** stage 4 (coldest tyre warming) and the anytime pressure warning */
+function drawTyres(cv, ph, d, opts, deg) {
+    const ty = d.tyres || {};
+    if (ph === 'pressure') {
+        const lo = ty.low;
+        cv.text('TYRE', 8, 34, 22, DIM, { font: 'bold' });
+        cv.text(CORNER[lo.corner] + ' ' + pres(lo.p, opts.pressureUnit), 90, 40, 40, COLD, { font: 'bold' });
+        cv.text('LOW', IW - 8, 36, 26, COLD, { font: 'bold', align: 'right' });
+        cv.roundRect(8, 58, IW - 16, 12, 6, COLD);
+        cv.text('target ' + pres(lo.target, opts.pressureUnit) + ' - check it', 8, 100, 24, WARM);
+        return;
+    }
+    const v = ty.minT, ready = opts.tyreReady;
+    const done = num(v) && v >= ready;
+    const colour = done ? READY : !num(v) ? DIM : v < ready - 15 ? COLD : WARM;
+    const frac = !num(v) ? 0 : Math.max(0, Math.min(1, (v + 10) / (ready + 10)));
+    cv.text('TYRES', 8, 34, 22, DIM, { font: 'bold' });
+    cv.text(deg(v), 100, 40, 44, colour, { font: 'bold' });
+    cv.text(done ? 'READY' : !num(v) ? 'WAITING' : 'COLD', IW - 8, 36, 26, colour, { font: 'bold', align: 'right' });
+    cv.roundRect(8, 58, IW - 16, 12, 6, '#2a2a2a');
+    if (frac > 0) cv.roundRect(8, 58, Math.max(12, frac * (IW - 16)), 12, 6, colour);
+    cv.text(num(v) ? 'coldest ' + CORNER[ty.minCorner] + ' - easy on grip' : 'reading the tyres', 8, 100, 24, num(v) ? WARM : DIM);
+    cv.text('OIL+TRANS OK', IW - 8, 100, 22, READY, { align: 'right' });
+}
+
 /** one readout: phase is 'oil', 'trans' or 'ready' (both done, counting down to off) */
 function draw(cv, ph, d, opts) {
     cv.clear('#000000');                                  /* black reads as clear glass on a HUD */
     const f = opts.tempUnit === 'f';
     const deg = (c) => (num(c) ? Math.round(f ? c * 9 / 5 + 32 : c) + (f ? 'F' : 'C') : '--');
+    if (ph === 'tyres' || ph === 'pressure') return drawTyres(cv, ph, d, opts, deg);
     const isOil = ph !== 'trans';
     const v = isOil ? d.oil : d.trans, ready = isOil ? opts.readyAt : opts.transReady;
     const done = ph === 'ready' || (num(v) && v >= ready);
@@ -93,6 +124,7 @@ class WarmHud {
         this.oilOk = false; this.transOk = false; this.phase = 'oil';
         this.transWaitSince = 0;            /* when the trans phase began without a reading */
         this.firstTrans = null;
+        this.tyresOk = false; this.tyreWaitSince = 0; this.firstTyre = null;
     }
 
     available() { return !!ClusterRender; }
@@ -130,6 +162,10 @@ class WarmHud {
         const now = Date.now(), hideAfter = o.hideAfter;
         if (num(d.oil) && this.firstOil === null) this.firstOil = d.oil;
         if (num(d.trans) && this.firstTrans === null) this.firstTrans = d.trans;
+        const tyMin = d.tyres && d.tyres.minT;
+        if (num(tyMin) && this.firstTyre === null) this.firstTyre = tyMin;
+        if (!o.tyres) this.tyresOk = true;
+        else if (num(tyMin)) { if (tyMin >= o.tyreReady) this.tyresOk = true; else if (tyMin < o.tyreReady - 3) this.tyresOk = false; }
 
         if (num(d.oil)) { if (d.oil >= o.readyAt) this.oilOk = true; else if (d.oil < o.readyAt - 5) this.oilOk = false; }
         if (!o.trans) this.transOk = true;
@@ -137,14 +173,15 @@ class WarmHud {
 
         /* re-arm a finished drive only once the oil is properly cold again */
         if (this.done && num(d.oil) && d.oil < o.readyAt - 20) {
-            this.done = false; this.readySince = 0; this.transWaitSince = 0;
+            this.done = false; this.readySince = 0; this.transWaitSince = 0; this.tyreWaitSince = 0;
             this.ctx.log.info('hud: oil cold again, warm-up shown again');
         }
         if (this.done) return 'done';
 
         /* restart of a warm car: everything already at temperature on the first readings -> never show */
         if (hideAfter > 0 && this.readySince === 0 && num(this.firstOil) && this.firstOil >= o.readyAt &&
-            (!o.trans || (num(this.firstTrans) && this.firstTrans >= o.transReady))) {
+            (!o.trans || (num(this.firstTrans) && this.firstTrans >= o.transReady)) &&
+            (!o.tyres || (num(this.firstTyre) && this.firstTyre >= o.tyreReady))) {
             this.done = true; this.ctx.log.info('hud: already warm, staying off this drive'); return 'done';
         }
 
@@ -160,9 +197,19 @@ class WarmHud {
             } else { this.transWaitSince = 0; this.readySince = 0; return 'trans'; }
         }
 
+        if (!this.tyresOk) {
+            /* TPMS that never reports must not hold the HUD up either */
+            if (!num(tyMin)) {
+                if (!this.tyreWaitSince) this.tyreWaitSince = now;
+                if (now - this.tyreWaitSince > 60000) {
+                    this.tyresOk = true; this.ctx.log.warn('hud: no tyre temperature after 60 s, skipping the tyre stage');
+                } else { this.readySince = 0; return 'tyres'; }
+            } else { this.tyreWaitSince = 0; this.readySince = 0; return 'tyres'; }
+        }
+
         if (!this.readySince) this.readySince = now;
         if (hideAfter > 0 && (now - this.readySince) / 1000 >= hideAfter) {
-            this.done = true; this.ctx.log.info('hud: oil and gearbox warm, hidden for the rest of this drive'); return 'done';
+            this.done = true; this.ctx.log.info('hud: oil, gearbox and tyres warm, hidden for the rest of this drive'); return 'done';
         }
         return 'ready';
     }
@@ -176,9 +223,19 @@ class WarmHud {
             transReady: Number(set.get('transReady')) || 70,
             trans: set.get('trans') !== false,
             hideAfter: Number(set.get('hideWhenReady')) || 0,
+            tyres: set.get('tyres') !== false,
+            tyreReady: Number(set.get('tyreReady')) || 25,
+            pressureWarn: Number(set.get('pressureWarn')) || 0,
+            pressureUnit: set.get('pressureUnit') || 'psi',
             tempUnit: set.get('tempUnit'),
         };
-        const ph = this._phase(d, o);
+        let ph = this._phase(d, o);
+        /* a low tyre shows whatever the warm-up is doing, and after it is done */
+        const low = d.tyres && d.tyres.lowest;
+        if (o.pressureWarn > 0 && low && num(low.p) && num(low.target) && low.target - low.p >= o.pressureWarn) {
+            d = Object.assign({}, d, { tyres: Object.assign({}, d.tyres, { low: low }) });
+            ph = 'pressure';
+        }
         this.phase = ph;
         const st = state(d.oil, o.readyAt);
 
@@ -189,7 +246,7 @@ class WarmHud {
         } catch (e) { /* claims live on tmpfs; carry on if unreadable */ }
 
         /* nothing until the first oil reading; nothing once done */
-        if (!on || ph === 'done' || !num(d.oil)) { if (this.layer) this.off(); return st; }
+        if (!on || ph === 'done' || (!num(d.oil) && ph !== 'pressure')) { if (this.layer) this.off(); return st; }
 
         const r = this._rect();
         if (!this.layer) {
@@ -202,7 +259,9 @@ class WarmHud {
         }
 
         const rd = (v) => (num(v) ? Math.round(v) : 'x');
-        const key = ph + '|' + rd(d.oil) + '|' + rd(d.trans) + '|' + rd(d.coolant) + '|' + o.tempUnit;
+        const ty = d.tyres || {};
+        const key = ph + '|' + rd(d.oil) + '|' + rd(d.trans) + '|' + rd(d.coolant) + '|' + rd(ty.minT) + ty.minCorner +
+            '|' + (ty.low ? ty.low.corner + rd(ty.low.p * 10) : '') + '|' + o.tempUnit + o.pressureUnit;
         if (key === this.lastKey) return st;
         this.lastKey = key;
 

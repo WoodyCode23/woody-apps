@@ -10,6 +10,7 @@ const G = require('./kit/gauges');
 const Car = require('./kit/car');
 const { WarmHud, state, revCeiling } = require('./hud');
 const GearboxTemp = require('./gearbox');
+const { Tyres } = require('./tyres');
 
 const W = 1600, H = 520;
 const APP_ID = 'woodr_warmhud';
@@ -19,6 +20,8 @@ async function background(bg) {
     const car = new Car(bg, ['temps', 'rpm', 'speed'], gearbox.handlers());
     const hud = new WarmHud(bg, APP_ID);
     hud.start();
+    const tyres = new Tyres(bg);
+    tyres.start().catch((e) => bg.log.warn('tpms: ' + e));
 
     /* The gearbox temperature is a diagnostic read (UDS 22 to the EGS, through the kit's read-only link:
      * anything but reads throws before it leaves the head unit). Poll it ONLY while the engine runs and
@@ -37,7 +40,7 @@ async function background(bg) {
             const want = wantGearbox();
             if (want && !polling) { gearbox.start(); polling = true; bg.log.info('gearbox: polling (engine running)'); }
             else if (!want && polling) { gearbox.stop(); polling = false; bg.log.info('gearbox: stopped'); }
-            hud.update(Object.assign({}, car.live, { trans: gearbox.value() }));
+            hud.update(Object.assign({}, car.live, { trans: gearbox.value(), tyres: tyres.snapshot() }));
         } catch (e) { bg.log.warn('hud tick: ' + e); }
     };
     const timer = setInterval(tick, 1000);
@@ -46,7 +49,7 @@ async function background(bg) {
     bg.settings.onChange(tick);
     process.on('exit', () => { clearInterval(timer); gearbox.stop(); hud.stop(); });
     tick();
-    return { car: car, hud: hud, gearbox: gearbox };
+    return { car: car, hud: hud, gearbox: gearbox, tyres: tyres };
 }
 
 mgu.run({
@@ -54,7 +57,7 @@ mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
         const bgm = ctx.background || await background(ctx);
-        const car = bgm.car, hud = bgm.hud, gearbox = bgm.gearbox;
+        const car = bgm.car, hud = bgm.hud, gearbox = bgm.gearbox, tyres = bgm.tyres;
         const hudOk = hud.available();
         let lastSt = null;
 
@@ -75,6 +78,15 @@ mgu.run({
             cv.text('Coolant', 48, 270, 26, t.dim);
             cv.text(shown(d.coolant), 260, 270, 42, num(d.coolant) ? t.text : t.dim, { font: 'bold' });
             const tr = gearbox.value();
+            const ty = tyres.snapshot();
+            const corner = (c) => ({ FLH: 'FL', FRH: 'FR', RLH: 'RL', RRH: 'RR' })[c] || '';
+            cv.text('Tyres', 420, 270, 26, t.dim);
+            cv.text(num(ty.minT) ? shown(ty.minT) + ' ' + corner(ty.minCorner) : '--', 520, 270, 30, num(ty.minT) ? t.text : t.dim, { font: 'bold' });
+            if (ty.lowest && num(ty.lowest.p)) {
+                const psi = settings.get('pressureUnit') !== 'bar';
+                const f = (b) => (psi ? Math.round(b * 14.5038) + ' psi' : b.toFixed(1) + ' bar');
+                cv.text('low ' + corner(ty.lowest.corner) + ' ' + f(ty.lowest.p) + ' / ' + f(ty.lowest.target), 420, 320, 22, t.dim);
+            }
             cv.text('Gearbox', 48, 320, 26, t.dim);
             cv.text(settings.get('trans') === false ? 'off' : shown(tr) + (num(tr) && gearbox.source ? '  (' + gearbox.source + ')' : ''),
                 260, 320, 34, num(tr) ? t.text : t.dim, { font: 'bold' });
@@ -95,7 +107,9 @@ mgu.run({
             if (!hudOk) { line = 'cluster-render not available'; colour = t.warn; }
             else if (!on) { line = 'Turned off in settings'; colour = t.dim; }
             else if (hud.layer) { line = 'Showing on the HUD'; colour = '#2fd27a'; }
-            else if (hud.done) { line = 'Done for this drive - oil and gearbox warm'; colour = '#2fd27a'; }
+            else if (hud.phase === 'pressure') { line = 'Showing a low tyre'; colour = '#ff9d3b'; }
+            else if (hud.done) { line = 'Done for this drive - oil, gearbox and tyres warm'; colour = '#2fd27a'; }
+            else if (hud.layer && hud.phase === 'tyres') { line = 'Showing tyre warm-up'; colour = '#2fd27a'; }
             else if (hud.layer && hud.phase === 'trans') { line = 'Showing gearbox warm-up'; colour = '#2fd27a'; }
             else if (!(typeof car.live.oil === 'number')) { line = 'Waiting for the oil reading'; colour = t.dim; }
             else { line = 'Waiting for the HUD'; colour = t.dim; }

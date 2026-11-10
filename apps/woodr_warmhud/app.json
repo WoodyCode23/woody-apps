@@ -1,8 +1,8 @@
 {
   "id": "woodr_warmhud",
   "title": "Warm-Up HUD",
-  "description": "Warm-up on the head-up display: oil first, then the gearbox, then it turns itself off",
-  "version": "0.5.0",
+  "description": "Warm-up on the head-up display: oil, then the gearbox, then the tyres, then it turns itself off. Warns of a low tyre any time.",
+  "version": "0.6.0",
   "vendor": "custom",
   "loggingId": "OAA6",
   "iconGlyph": "warmup",
@@ -31,6 +31,12 @@
       "_broadcasts": [
         "sendTasuResponse"
       ]
+    },
+    "de.bmw.infotainment.vehicle.TPMS": {
+      "_optional": "tyre temperatures for the warm-up and pressures for the low-tyre warning",
+      "statusTyrePressure": "rs",
+      "statusTyreTemperature": "rs",
+      "statusTargetTyrePressure": "rs"
     }
   },
   "screens": [
@@ -94,6 +100,71 @@
       "when": {
         "trans": true
       }
+    },
+    {
+      "key": "tyres",
+      "label": "Tyre warm-up after the gearbox",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "tyreReady",
+      "label": "Tyres ready above",
+      "type": "number",
+      "unit": "C",
+      "default": 25,
+      "steps": [
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40
+      ],
+      "when": {
+        "tyres": true
+      }
+    },
+    {
+      "key": "pressureWarn",
+      "label": "Warn when a tyre is low by",
+      "type": "choice",
+      "default": "0.2",
+      "options": [
+        [
+          "0",
+          "Off"
+        ],
+        [
+          "0.14",
+          "0.14 bar / 2 psi"
+        ],
+        [
+          "0.2",
+          "0.2 bar / 3 psi"
+        ],
+        [
+          "0.3",
+          "0.3 bar / 4 psi"
+        ]
+      ]
+    },
+    {
+      "key": "pressureUnit",
+      "label": "Pressure unit",
+      "type": "choice",
+      "default": "psi",
+      "options": [
+        [
+          "psi",
+          "psi"
+        ],
+        [
+          "bar",
+          "bar"
+        ]
+      ]
     },
     {
       "key": "hideWhenReady",
