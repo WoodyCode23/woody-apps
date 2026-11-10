@@ -116,6 +116,14 @@ const PICS = {
         c.circle(70, 90, 10, withAlpha(WHITE, 0.2));
         c.circle(70, 90, 6, WHITE);
     },
+    /* Woody HUD: a windshield with a menu on it, the picked row in red, a red shift frame round it */
+    woodr_hud(c) {
+        c.convex([[30, 58], [110, 58], [118, 116], [22, 116]], withAlpha(WHITE, 0.08));
+        c.strokeRoundRect(38, 64, 64, 46, 6, 3, HOT);
+        c.fillRect(46, 72, 48, 6, withAlpha(WHITE, 0.55));
+        c.roundRect(44, 82, 52, 9, 3, RED);
+        c.fillRect(46, 96, 40, 6, withAlpha(WHITE, 0.55));
+    },
     /* Home Assistant: a house with a lit red door and a signal over it */
     woodr_hass(c) {
         c.triangle([[30, 86], [70, 54], [110, 86]], WHITE);

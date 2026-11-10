@@ -21,6 +21,7 @@ const { withAlpha } = require('./kit/canvas');
 const { HudClaim } = require('./kit/hud_claim');
 const { Light, NAMES, SWATCH } = require('./light');
 const { Taps } = require('./taps');
+const shared = require('./shared');
 
 const W = 1600, H = 520;
 const CYCLES = {
@@ -61,6 +62,14 @@ async function background(bg) {
         else if (n === 6) { st.revOn = !st.revOn; settings.set('revFollow', st.revOn); light.flash(); }
     });
     await taps.start();
+
+    /* Woody HUD's menu: "Ambient: next colour" bumps n in /dev/shm/woody/ambient.json */
+    let menuN = (shared.read('ambient.json') || {}).n || 0;
+    const menuTimer = setInterval(() => {
+        const a = shared.read('ambient.json');
+        if (a && a.cmd === 'next' && a.n !== menuN) { menuN = a.n; nextColour(); }
+    }, 500);
+    if (menuTimer.unref) menuTimer.unref();
 
     /* rev-follow: stages with hysteresis */
     function revTick() {

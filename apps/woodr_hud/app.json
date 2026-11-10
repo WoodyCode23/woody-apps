@@ -1,0 +1,39 @@
+{
+  "id": "woodr_hud",
+  "title": "Woody HUD",
+  "description": "A menu on the head-up display worked by the left stalk's high-beam-assistant button (double-tap to open, double-tap to pick), and shift lights as a border round the Waze map. Hide or show Warm-Up HUD, resize the Waze map, step the ambient colour.",
+  "version": "0.1.0",
+  "vendor": "custom",
+  "loggingId": "OAAE",
+  "iconGlyph": "live_data",
+  "autostart": true,
+  "mguHmi": ["ID7"],
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.body.Light": {
+      "_optional": "the high-beam-assistant button that works the menu",
+      "IndicatorSteeringColumnComplete": "s"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Woody HUD",
+      "buttons": [
+        ["BTN_ACTION", "Shift lights on/off"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "menu", "label": "Double-tap opens the HUD menu", "type": "bool", "default": true},
+    {"key": "shift", "label": "Shift lights", "type": "bool", "default": true},
+    {"key": "greenRpm", "label": "Green from", "type": "number", "unit": "rpm", "default": 4000, "min": 2000, "max": 7000, "step": 100},
+    {"key": "yellowRpm", "label": "Yellow from", "type": "number", "unit": "rpm", "default": 5500, "min": 2500, "max": 7200, "step": 100},
+    {"key": "redRpm", "label": "Red from", "type": "number", "unit": "rpm", "default": 6300, "min": 3000, "max": 7300, "step": 100},
+    {"key": "shiftRpm", "label": "Flash from", "type": "number", "unit": "rpm", "default": 6800, "min": 3500, "max": 7400, "step": 100}
+  ]
+}

@@ -12,6 +12,7 @@ const { WarmHud, state, revCeiling } = require('./hud');
 const GearboxTemp = require('./gearbox');
 const { Tyres, shownUnits, presText } = require('./tyres');
 const { Taps } = require('./taps');
+const shared = require('./shared');
 
 const W = 1600, H = 520;
 const APP_ID = 'woodr_warmhud';
@@ -39,6 +40,7 @@ async function background(bg) {
     let polling = false;
     const tick = () => {
         try {
+            followMenu();
             const want = wantGearbox();
             if (want && !polling) { gearbox.start(); polling = true; bg.log.info('gearbox: polling (engine running)'); }
             else if (!want && polling) { gearbox.stop(); polling = false; bg.log.info('gearbox: stopped'); }
@@ -47,7 +49,19 @@ async function background(bg) {
     };
     /* double-tap the high-beam-assistant button (left stalk): hide / show the HUD for this drive. Two taps toggle
      * the assistant back where it was, so the car's own function is untouched. */
-    const taps = new Taps(bg, (n) => { if (n === 2 && bg.settings.get('taps') !== false) { hud.toggle(); tick(); } });
+    /* Woody HUD's menu, when it runs, owns the double-tap: its choice comes through /dev/shm/woody/hud.json */
+    const woodyHud = () => !!shared.read('hud.json', 0);
+    const taps = new Taps(bg, (n) => { if (n === 2 && bg.settings.get('taps') !== false && !woodyHud()) { hud.toggle(); tick(); } });
+    let menuSeen = null;
+    const followMenu = () => {
+        const s = shared.read('hud.json');
+        const w = s && s.warmup;
+        if (!w || w === menuSeen) return;
+        menuSeen = w;
+        hud.user = w === 'hide' ? 'hide' : w === 'show' ? 'show' : null;
+        hud.lastKey = '';
+        bg.log.info('hud: from the Woody HUD menu -> ' + w);
+    };
     taps.start().catch((e) => bg.log.warn('taps: ' + e));
     const timer = setInterval(tick, 1000);
     if (timer.unref) timer.unref();
