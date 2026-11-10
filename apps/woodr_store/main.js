@@ -20,7 +20,7 @@ const M = require('./model');
 const { Progress } = require('./progress');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '0.4.1';
+const APP_ID = 'woodr_store', VERSION = '0.4.2';
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
@@ -54,7 +54,19 @@ mgu.run({
         const t0 = Date.now();
 
         const client = new UpdaterClient({ hello: { id: APP_ID, version: VERSION } });
-        client.on('state', (s) => { state = s; live = true; demo = false; render().catch(() => {}); });
+        let launchChecked = false;
+        client.on('state', (s) => {
+            state = s; live = true; demo = false;
+            /* check every source once per launch, unless one is running or ran in the last 2 minutes */
+            if (!launchChecked) {
+                launchChecked = true;
+                const cat = s.catalog || {};
+                if (!cat.checking && (!cat.checkedAt || Date.now() - cat.checkedAt > 120000)) {
+                    client.check(); note = 'Checking for updates...'; noteAt = Date.now();
+                }
+            }
+            render().catch(() => {});
+        });
         client.on('down', (why) => { live = false; log.info('updater: ' + why); render().catch(() => {}); });
         client.on('reply-error', (err, op) => { note = (op || 'request') + ': ' + err; noteAt = Date.now(); render().catch(() => {}); });
         client.connect();
