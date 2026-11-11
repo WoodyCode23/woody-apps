@@ -8,11 +8,12 @@
  *
  * Source: de.bmw.infotainment.controlelements.SteeringWheelPushButton
  *   statusSpecialFunctionButton.operationPushButtonSpecialFunction   TASTER_GEDRUECKT (1) / KEINE_AKTION (0)
- *   statusRotarySteps.operationStepsKnurlSteeringWheel               a counter (0-255) that moves by the steps rolled
+ *   statusRotarySteps.operationStepsKnurlSteeringWheel               127 at rest, 127 + steps while it is rolled
  *
  *   const w = new Wheel(ctx, { onMenu: () => ..., onRoll: (steps) => ... }); await w.start();
  */
 const IFACE = 'de.bmw.infotainment.controlelements.SteeringWheelPushButton';
+const REST = 127;
 
 class Wheel {
     constructor(ctx, on) { this.ctx = ctx; this.on = on || {}; this.menuDown = false; this.lastSteps = null; this.error = null; }
@@ -26,14 +27,12 @@ class Wheel {
                 this.menuDown = down;
             },
             statusRotarySteps: (v) => {
+                /* Not a counter: the value rests at 127 and shows each movement as 127 + steps (128 = one step
+                 * one way, 126 = one the other, 132 = five at once), then goes back to 127. Seen on the car:
+                 * 126,125,127,126,127,128,127,128,129,128,127,128,132,127 (Input Lab 2026-11-10). */
                 const n = v && v.operationStepsKnurlSteeringWheel;
-                if (typeof n !== 'number' || n === 255) return;
-                if (this.lastSteps !== null) {
-                    let d = n - this.lastSteps;
-                    if (d > 127) d -= 256; else if (d < -127) d += 256;      /* the counter wraps */
-                    if (d) this._call('onRoll', d);
-                }
-                this.lastSteps = n;
+                if (typeof n !== 'number' || n === 255 || n === REST) return;
+                this._call('onRoll', n - REST);
             },
         }, this.ctx.log);
         if (sub && sub.error) { this.error = sub.error; this.ctx.log.warn('wheel: ' + sub.error); }
