@@ -50,6 +50,11 @@ try { ClusterRender = require('./cluster_render_client').ClusterRender; } catch 
 const TARGET = 'map';
 const SCENE_W = 1088, SCENE_H = 480;
 const GAP = { x: 292, y: 76, w: 504, h: 343 };
+/* The same picture on the head-up display (setting 'doorbellScreen'): the 800x480 `hud` scene, whose visible
+ * window on this car is 120,100 570x278. The camera's shape at the window's full height, centred. It covers
+ * BMW's own HUD content while it shows, which is why it stays behind the same parked-only gate. */
+const HUD_TARGET = 'hud';
+const HUD_BOX = { x: 201, y: 103, w: 408, h: 272 };
 const BANNER = { x: 344, y: 196, w: 400, h: 64 };
 const STOPPED_KMH = 2;
 const MAX_SECS = 60;             /* no episode outlives this, whatever else fails */
@@ -66,6 +71,8 @@ class Doorbell {
         this.relay = relay;
         this.camera = '';            /* the relay's camera name for this episode */
         this.fetching = false;
+        this.box = GAP;              /* where this episode's picture is drawn */
+        this.target = TARGET;
         this.live = null;            /* stop() of the running live stream */
         this.liveLatest = null;      /* the newest frame not yet drawn: newer ones replace it, none queue */
         this.liveBusy = false;
@@ -176,7 +183,10 @@ class Doorbell {
         this.frames = 0;
         const want = this._allowed();
         if (!want) { this.why = 'suppressed: ' + (this._mode() === 'off' ? 'turned off' : 'car is moving'); this._changed(); return; }
-        this.log.info('doorbell: ring - showing ' + want + ' on ' + TARGET + ' for ' + secs + ' s');
+        const hud = this.settings.get('doorbellScreen') === 'hud' && want === 'image';
+        this.target = hud ? HUD_TARGET : TARGET;
+        this.box = want === 'image' ? (hud ? HUD_BOX : GAP) : BANNER;
+        this.log.info('doorbell: ring - showing ' + want + ' on ' + this.target + ' for ' + secs + ' s');
         this._show(want, 'doorbell rang');
     }
 
@@ -202,12 +212,14 @@ class Doorbell {
         if (!this.cr || !this.available) { this.why = 'cluster-render not available'; this._changed(); return; }
         if (this.kind === kind && this.layer) return;
         this._dropLayer();
-        const box = kind === 'image' ? GAP : BANNER;
+        if (kind !== 'image') { this.target = TARGET; this.box = BANNER; }      /* the banner is a cluster thing */
+        else if (this.box === BANNER) this.box = this.target === HUD_TARGET ? HUD_BOX : GAP;
+        const box = this.box;
         /* class 'alert' sits above Waze's own layer; a modest z so a real warning overlay from
          * another app can still be put over this one. exclusive stays 0: hiding every layer below
          * would blank the cluster, which is exactly what must not happen. */
         this.layer = this.cr.image({
-            target: TARGET, klass: 'alert', z: 100,
+            target: this.target, klass: 'alert', z: 100,
             x: box.x, y: box.y, w: box.w, h: box.h, iw: box.w, ih: box.h,
             fps: kind === 'image' ? 6 : 1,
             sampling: 'bilinear', visible: true, opacity: 1,
@@ -216,7 +228,7 @@ class Doorbell {
         if (!this.layer) { this.why = 'layer refused'; this.log.warn('doorbell: image layer refused'); this._changed(); return; }
         this.kind = kind;
         this.why = why;
-        this.claim.hold(true, 'doorbell/' + kind);
+        if (this.target === TARGET) this.claim.hold(true, 'doorbell/' + kind);     /* the claim is about the cluster's map slot */
         this.pixbuf = Buffer.alloc(box.w * box.h * 4);
         this._paintChrome();
         if (kind === 'image') { this._poll(); this._liveStart(); }
@@ -243,7 +255,7 @@ class Doorbell {
     /** The first thing on screen: a framed box with the label, so something shows before a frame. */
     _paintChrome(note) {
         if (!this.layer) return;
-        const box = this.kind === 'image' ? GAP : BANNER;
+        const box = this.box;
         const cv = new Canvas(box.w, box.h);
         cv.clear([0, 0, 0, 0]);
         cv.roundRect(0, 0, box.w, box.h, 10, '#0b0b0bdd');
@@ -326,7 +338,7 @@ class Doorbell {
         if (!this.layer || this.kind !== 'image') return;
         const img = jpeg.decode(jpg);
         if (!img) { this._paintChrome('frame could not be decoded'); return; }
-        const box = GAP;
+        const box = this.box;
         jpeg.fit(img.rgba, img.w, img.h, box.w, box.h, this.pixbuf);
         this.frames++;
         this._push(this.pixbuf);
@@ -335,4 +347,4 @@ class Doorbell {
     _changed() { if (this.onChange) { try { this.onChange(); } catch (e) { /* the screen's problem */ } } }
 }
 
-module.exports = { Doorbell, GAP, BANNER, TARGET, SCENE_W, SCENE_H, STOPPED_KMH };
+module.exports = { Doorbell, GAP, HUD_BOX, BANNER, TARGET, SCENE_W, SCENE_H, STOPPED_KMH };
