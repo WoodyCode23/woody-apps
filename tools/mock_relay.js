@@ -118,6 +118,16 @@ http.createServer((req, res) => {
         }
         if (p.indexOf(BASE + '/camera/') === 0) {
             if (!session().unlocked) return send(403, { error: 'locked' });
+            if (p === BASE + '/camera/front_door/stream') {      /* the still, four times a second, for 20 s */
+                if (!JPEG) return send(404, { error: 'no-such-camera' });
+                res.writeHead(200, { 'Content-Type': 'multipart/x-mixed-replace;boundary=frame', 'Cache-Control': 'no-store' });
+                const part = () => { res.write('--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ' + JPEG.length + '\r\n\r\n'); res.write(JPEG); res.write('\r\n'); };
+                const iv = setInterval(part, 250);
+                const stop = () => { clearInterval(iv); try { res.end(); } catch (e) { /* closed */ } };
+                setTimeout(stop, 20000);
+                res.on('close', stop);
+                return undefined;
+            }
             if (p !== BASE + '/camera/front_door') return send(404, { error: 'no-such-camera' });
             if (!JPEG) return send(502, { error: 'camera-failed' });
             res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' });

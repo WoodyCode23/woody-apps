@@ -66,6 +66,11 @@ class Doorbell {
         this.relay = relay;
         this.camera = '';            /* the relay's camera name for this episode */
         this.fetching = false;
+        this.live = null;            /* stop() of the running live stream */
+        this.liveLatest = null;      /* the newest frame not yet drawn: newer ones replace it, none queue */
+        this.liveBusy = false;
+        this.liveFrames = 0;
+        this.lastLive = 0;
         this.appId = appId;
         this.cr = null;
         this.layer = 0;
@@ -123,7 +128,7 @@ class Doorbell {
     status() {
         return {
             shown: !!this.layer, kind: this.kind, mode: this._mode(), why: this.why,
-            frames: this.frames, target: this.targetState, available: this.available,
+            frames: this.frames, live: this.liveFrames, target: this.targetState, available: this.available,
             secsLeft: this.layer ? Math.max(0, Math.round((this.until - Date.now()) / 1000)) : 0,
             others: ClusterClaim.others(TARGET, this.appId),
             decoder: jpeg.available(),
@@ -204,7 +209,7 @@ class Doorbell {
         this.layer = this.cr.image({
             target: TARGET, klass: 'alert', z: 100,
             x: box.x, y: box.y, w: box.w, h: box.h, iw: box.w, ih: box.h,
-            fps: kind === 'image' ? 2 : 1,
+            fps: kind === 'image' ? 6 : 1,
             sampling: 'bilinear', visible: true, opacity: 1,
             contend: this._contend(), guide_hold: 1,
         });
@@ -214,7 +219,7 @@ class Doorbell {
         this.claim.hold(true, 'doorbell/' + kind);
         this.pixbuf = Buffer.alloc(box.w * box.h * 4);
         this._paintChrome();
-        if (kind === 'image') this._poll();
+        if (kind === 'image') { this._poll(); this._liveStart(); }
         this._changed();
     }
 
@@ -228,6 +233,7 @@ class Doorbell {
     }
 
     _dropLayer() {
+        this._liveStop();
         if (this.layer && this.cr) { try { this.cr.drop(this.layer); } catch (e) { this.log.warn('doorbell: drop: ' + e); } }
         this.layer = 0;
         this.kind = '';
@@ -262,6 +268,7 @@ class Doorbell {
         if (!this.camera) { this._paintChrome('no camera for this doorbell'); return; }
         if (!jpeg.available()) { this._paintChrome('no JPEG decoder in the app'); return; }
         const now = Date.now();
+        if (this.live && now - this.lastLive < 3000) return;      /* live frames are arriving: stills stand by */
         if (now - this.lastPush < 1000) return;
         this.lastPush = now;
         this.fetching = true;
@@ -274,6 +281,45 @@ class Doorbell {
             this.log.warn('doorbell: camera: ' + e.message);
             if (this.layer === layer) this._paintChrome(e.message === 'locked' ? 'locked' : 'camera unreachable');
         });
+    }
+
+    /**
+     * Live video, when the relay has it for this camera. Stills start at once and carry on until live
+     * frames arrive (a Ring stream takes a few seconds to start); if the stream stalls or ends, stills resume.
+     * Only the newest frame is ever decoded: the rest are dropped. Measured on the car 2026-11-11: a 640 px
+     * JPEG decodes in about 60 ms, and cluster-render's upload budget (5500 KB/s shared) allows about 5 of
+     * these 504x343 frames a second with the Waze map also on the cluster.
+     */
+    _liveStart() {
+        if (this.live || !this.camera || !jpeg.available() || this.settings.get('doorbellLive') === false) return;
+        const layer = this.layer;
+        this.liveFrames = 0;
+        this.lastLive = 0;
+        this.live = this.relay.cameraStream(this.camera, (jpg) => {
+            if (this.layer !== layer) return;
+            this.liveLatest = jpg;
+            if (this.liveBusy) return;
+            this.liveBusy = true;
+            setImmediate(() => {
+                const j = this.liveLatest;
+                this.liveLatest = null;
+                this.liveBusy = false;
+                if (!j || this.layer !== layer) return;
+                this.liveFrames++;
+                this.lastLive = Date.now();
+                this._frame(j);
+            });
+        }, (why) => {
+            this.live = null;
+            this.log.info('doorbell: live video ended (' + why + ') after ' + this.liveFrames + ' frame(s)');
+        });
+    }
+
+    _liveStop() {
+        const stop = this.live;
+        this.live = null;
+        this.liveLatest = null;
+        if (stop) stop();
     }
 
     _frame(jpg) {

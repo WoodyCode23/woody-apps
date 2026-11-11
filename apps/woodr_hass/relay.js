@@ -20,6 +20,7 @@
  *   r.scanCode()                             a fresh unlock code for the lock screen
  *   r.action(tile, action) -> Promise<{ ok } | { error }>
  *   r.lock('button')  r.car(body)  r.camera(name) -> Promise<Buffer>
+ *   r.cameraStream(name, onFrame, onEnd) -> stop()     live JPEG frames, when the relay has them
  *   r.fresh()                                was the house state confirmed within FRESH_MS?
  *
  * Nothing here throws out of a callback (an uncaught error exits the app).
@@ -38,6 +39,7 @@ const POLL_TIMEOUT_MS = 30000;
 const CALL_TIMEOUT_MS = 10000;
 const FRESH_MS = 40000;
 const BACKOFF_MS = [2000, 5000, 10000, 30000];
+const JPEG_START = Buffer.from([0xff, 0xd8, 0xff]), JPEG_END = Buffer.from([0xff, 0xd9]);
 const MAX_REPLY = 2 * 1024 * 1024;    /* a 640 px camera JPEG is ~20-60 KB */
 
 function writeWhole(file, text, mode) {
@@ -296,6 +298,57 @@ class Relay extends EventEmitter {
             if (r.status !== 200 || !/^image\//.test(r.type)) throw new Error((r.json && r.json.error) || ('HTTP ' + r.status));
             return r.body;
         });
+    }
+
+    /**
+     * The camera as moving pictures: the relay's multipart stream of JPEGs (/camera/<name>/stream).
+     * onFrame(jpeg) is called with each whole frame; onEnd(why) once, when it stops for any reason
+     * ('no-stream': this relay or this camera has none, so stay on stills). Returns a function that stops it.
+     * Frames are cut at the JPEG start and end markers, which a JPEG's own data never contains.
+     */
+    cameraStream(name, onFrame, onEnd) {
+        let done = false, req = null, buf = Buffer.alloc(0);
+        const end = (why) => {
+            if (done) return;
+            done = true;
+            try { if (req) req.abort(); } catch (e) { /* already gone */ }
+            if (onEnd) { try { onEnd(why); } catch (e) { this.log.warn('relay: stream end handler: ' + e); } }
+        };
+        const stop = () => end('stopped');
+        if (!this.base || !this.token) { setImmediate(() => end('not paired')); return stop; }
+        try {
+            const plain = this.base.protocol === 'http:';
+            req = (plain ? http : https).request({
+                method: 'GET', host: this.base.hostname, port: this.base.port || (plain ? 80 : 443),
+                path: this.base.pathname.replace(/\/$/, '') + '/camera/' + encodeURIComponent(name) + '/stream',
+                headers: { 'X-Car-Token': this.token, Accept: 'multipart/x-mixed-replace' },
+                lookup: netlease.lookup, agent: false,
+            }, (res) => {
+                if (res.statusCode !== 200) {
+                    res.resume();
+                    return end(res.statusCode === 404 ? 'no-stream' : res.statusCode === 403 ? 'locked' : 'HTTP ' + res.statusCode);
+                }
+                res.on('data', (c) => {
+                    buf = buf.length ? Buffer.concat([buf, c]) : c;
+                    for (;;) {
+                        const a = buf.indexOf(JPEG_START);
+                        if (a < 0) { if (buf.length > 2) buf = buf.slice(buf.length - 2); return; }
+                        const b = buf.indexOf(JPEG_END, a + 3);
+                        if (b < 0) { if (a > 0) buf = buf.slice(a); if (buf.length > MAX_REPLY) buf = Buffer.alloc(0); return; }
+                        const frame = buf.slice(a, b + 2);
+                        buf = buf.slice(b + 2);
+                        try { onFrame(frame); } catch (e) { this.log.warn('relay: stream frame handler: ' + e); }
+                        if (done) return;
+                    }
+                });
+                res.on('end', () => end('ended'));
+                res.on('error', (e) => end(e.message));
+            });
+        } catch (e) { setImmediate(() => end(e.message)); return stop; }
+        req.setTimeout(20000, () => end('no picture for 20 s'));
+        req.on('error', (e) => end(e.message));
+        req.end();
+        return stop;
     }
 
     _changed() { try { this.emit('change'); } catch (e) { this.log.warn('relay change: ' + e); } }
