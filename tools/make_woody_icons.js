@@ -135,6 +135,14 @@ const PICS = {
         c.circle(84, 74, 10, withAlpha(RED, 0.3));
         c.arc(64, 118, 18, 22, 100, 300, withAlpha(HOT, 0.8));
     },
+    /* Drive Log: a line chart being written, with a red pen point */
+    woodr_drivelog(c) {
+        c.line(28, 56, 28, 116, 3, withAlpha(WHITE, 0.5));
+        c.line(28, 116, 114, 116, 3, withAlpha(WHITE, 0.5));
+        glowLine(c, [[32, 104], [48, 96], [60, 100], [74, 78], [88, 84], [104, 62]], WHITE, 3);
+        c.circle(104, 62, 7, withAlpha(RED, 0.4));
+        c.circle(104, 62, 4, HOT);
+    },
     /* Home Assistant: a house with a lit red door and a signal over it */
     woodr_hass(c) {
         c.triangle([[30, 86], [70, 54], [110, 86]], WHITE);
