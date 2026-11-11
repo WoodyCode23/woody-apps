@@ -17,9 +17,10 @@
  *   - So the hand-back is simply cr.drop(layer): Waze's layer still wants the target, the target
  *     is never released, and BMW's content comes back on its own once no layer wants it.
  *
- * Geometry: `map` is 1088x480 on iDrive 7. The gap between the G80's speed readouts has NOT been
- * measured on this car - GAP below is a placeholder. Measure it with woodr_screenlab (grid on the
- * `map` target, photograph, read the numbers off) and change it here.
+ * Geometry: `map` is 1088x480 on iDrive 7. GAP is the picture's box: the cluster's own advertised safe area
+ * on this car (286,72 504x368, read with carplay_patch.js status), with the camera's 3:2-ish shape kept.
+ * A first box of 300x204 showed on the car on 2026-11-11 and read as small; BMW's speed and tyre readouts
+ * start just outside the safe area, so this is as large as it goes without covering them.
  *
  * Safety: a moving picture in the driver's primary field of view is a genuine distraction, and in
  * many places a video visible to the driver while the car is in motion is also not legal. The
@@ -48,8 +49,7 @@ try { ClusterRender = require('./cluster_render_client').ClusterRender; } catch 
 
 const TARGET = 'map';
 const SCENE_W = 1088, SCENE_H = 480;
-/* PLACEHOLDER - the gap between the speed readouts, to be measured with woodr_screenlab. */
-const GAP = { x: 394, y: 128, w: 300, h: 204 };
+const GAP = { x: 292, y: 76, w: 504, h: 343 };
 const BANNER = { x: 344, y: 196, w: 400, h: 64 };
 const STOPPED_KMH = 2;
 const MAX_SECS = 60;             /* no episode outlives this, whatever else fails */
