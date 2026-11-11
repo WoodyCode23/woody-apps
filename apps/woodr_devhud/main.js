@@ -17,7 +17,7 @@ const { UpdaterClient } = require('./updater_client');
 const { DevHud, rows, draw, IW, IH } = require('./devhud');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_devhud', VERSION = '0.1.3';
+const APP_ID = 'woodr_devhud', VERSION = '0.1.4';
 const LEASE = '/run/mgu-uplink/lease.json';
 const FEED_FRESH_MS = 60000;
 const MOVING_KMH = 5;
@@ -34,7 +34,7 @@ async function background(bg) {
     }, log, { pollMs: 30000 }).then((s) => log.info('battery ' + (s.error ? 'error: ' + s.error : 'subscribed')));
 
     const up = new UpdaterClient({ hello: { id: APP_ID, version: VERSION } });
-    up.on('state', (s) => { st.updater = s; tick(); });
+    up.on('state', (s) => { st.updater = s; });      /* drawn by the 1 s tick, not on every push */
     up.on('down', () => { st.updater = null; });
     up.connect();
     /* the updater's pushes can be sparse: ask while a job runs, so the bar moves */

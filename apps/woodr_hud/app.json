@@ -2,7 +2,7 @@
   "id": "woodr_hud",
   "title": "Woody HUD",
   "description": "A menu on the head-up display worked from the steering wheel (the menu button opens and picks, the right roller moves), and shift lights as a border round the Waze map. Hide or show Warm-Up HUD, resize the Waze map, step the ambient colour.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",

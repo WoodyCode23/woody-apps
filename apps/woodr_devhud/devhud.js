@@ -21,7 +21,8 @@ try { ClusterRender = require('./cluster_render_client').ClusterRender; } catch 
 
 const SLOT = { x: 220, y: 185, w: 470, h: 133 };
 const IW = 470, IH = 133;
-const FPS = 4;
+const FPS = 2;
+const MIN_GAP_MS = 500;
 const ROWS = 3, ROW_H = 42;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b', RED = '#ff5a4d', DIM = '#9a9a9a', TEXT = '#ffffff';
 
@@ -110,6 +111,12 @@ class DevHud {
         }
         const key = JSON.stringify(list.map((r) => [r.label, r.text, r.frac === null || r.frac === undefined ? -1 : Math.round(r.frac * 100), r.colour]));
         if (key === this.lastKey) return;
+        /* at most MIN_GAP_MS between uploads: the updater pushes its state many times a second during a download,
+         * and every push used to become a frame (4930 frames / 592 MB a minute on the car, starving the cluster's
+         * upload budget). A skipped change is drawn by the next 1 s tick. */
+        const now = Date.now();
+        if (now - (this.lastPushAt || 0) < MIN_GAP_MS) return;
+        this.lastPushAt = now;
         this.lastKey = key;
         const cv = new Canvas(IW, IH);
         draw(cv, list);

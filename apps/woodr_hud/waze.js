@@ -30,7 +30,9 @@ function ask(msg, timeoutMs) {
         const finish = (v) => { if (done) return; done = true; try { s.destroy(); } catch (e) { /* closed */ } resolve(v); };
         const s = net.connect(SOCK);
         s.setEncoding('utf8');
-        s.on('connect', () => s.write(JSON.stringify(msg) + '\n'));
+        /* the service sends its status by itself on connect; only real commands are written ("status" is not one:
+         * it logged "unknown or malformed command status" at every poll) */
+        s.on('connect', () => { if (msg && msg.cmd && msg.cmd !== 'status') s.write(JSON.stringify(msg) + '\n'); });
         s.on('data', (d) => {
             buf += d;
             buf.split('\n').forEach((line) => {
@@ -50,7 +52,7 @@ class Waze {
     /** the map is on the HUD now: its box, else null */
     hudBox() {
         const s = this.st;
-        if (!s || Date.now() - this.at > 15000 || Number(s.hud) !== 1 || s.hud_state !== 'showing') return null;
+        if (!s || Date.now() - this.at > 45000 || Number(s.hud) !== 1 || s.hud_state !== 'showing') return null;
         return boxOf(s);
     }
     setSize(pct) { this.log.info('waze: hud width ' + pct + '%'); return ask({ cmd: 'hud', hud_width_pct: String(pct) }).then(() => this.poll()); }

@@ -174,7 +174,7 @@ async function background(bg) {
         } catch (e) { log.warn('shift: ' + e); }
     }, 120);
 
-    const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 4000);
+    const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 15000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
     process.on('exit', () => { [menuTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
