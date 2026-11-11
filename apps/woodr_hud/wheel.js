@@ -4,13 +4,14 @@
  * right-hand roller, as the HUD menu's controls. Listens only: the car does with them what it always does.
  *
  *   On this car (Input Lab, 2026-11-10): the menu button opens BMW's list on the HUD; rolling the roller scrolls it;
- *   pressing the roller picks in it (so it is NOT used here: that would also pick in BMW's list).
+ *   pressing the roller picks in it. Ryan asked for the roller press as our confirm too (2026-11-11), knowing that.
  *
  * Source: de.bmw.infotainment.controlelements.SteeringWheelPushButton
  *   statusSpecialFunctionButton.operationPushButtonSpecialFunction   TASTER_GEDRUECKT (1) / KEINE_AKTION (0)
+ *   statusRotaryPress.operationPushButtonKnurlSteeringWheel          RAENDELRAD_GEDRUECKT (1) while pressed
  *   statusRotarySteps.operationStepsKnurlSteeringWheel               127 at rest, 127 + steps while it is rolled
  *
- *   const w = new Wheel(ctx, { onMenu: () => ..., onRoll: (steps) => ... }); await w.start();
+ *   const w = new Wheel(ctx, { onMenu: () => ..., onRoll: (steps) => ..., onPress: () => ... }); await w.start();
  */
 const IFACE = 'de.bmw.infotainment.controlelements.SteeringWheelPushButton';
 const REST = 127;
@@ -25,6 +26,12 @@ class Wheel {
                 const down = s === 'TASTER_GEDRUECKT' || s === 1;
                 if (down && !this.menuDown) this._call('onMenu');
                 this.menuDown = down;
+            },
+            statusRotaryPress: (v) => {
+                const s = v && v.operationPushButtonKnurlSteeringWheel;
+                const down = s === 'RAENDELRAD_GEDRUECKT' || s === 1;
+                if (down && !this.rollerDown) this._call('onPress');
+                this.rollerDown = down;
             },
             statusRotarySteps: (v) => {
                 /* Not a counter: the value rests at 127 and shows each movement as 127 + steps (128 = one step

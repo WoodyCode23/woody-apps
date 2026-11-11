@@ -109,6 +109,11 @@ async function background(bg) {
         onMenu: () => {
             if (settings.get('menu') === false) return;
             if (!st.menuOpen) { st.menuOpen = true; st.at = 0; st.touched = Date.now(); showMenu(); log.info('menu: open'); return; }
+            /* the menu button again closes the menu without picking; the roller's press picks */
+            closeMenu(); log.info('menu: closed (button)');
+        },
+        onPress: () => {
+            if (!st.menuOpen) return;
             const it = items()[st.at];
             closeMenu();
             if (it && it.key !== 'close') pick(it.key);
@@ -191,7 +196,7 @@ mgu.run({
             const cv = ctx.canvas(W, H).clear(t.bg);
             G.panel(cv, t, 24, 44, 760, 468, 'HUD menu');
             ['Press the menu button on the wheel (three lines, right side):', 'our menu opens on the HUD over BMW\'s list.',
-                'Roll the right roller to move, press the menu button again to pick.', '', 'It closes by itself after 10 s.']
+                'Roll the right roller to move, press the roller to pick, the menu button again to close.', '', 'It closes by itself after 10 s.']
                 .forEach((l, i) => cv.text(l, 48, 112 + i * 34, 21, i < 3 ? t.text : t.dim));
             bgm.items().forEach((it, i) => {
                 const y = 300 + i * 40;

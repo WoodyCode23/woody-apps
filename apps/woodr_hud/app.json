@@ -1,8 +1,8 @@
 {
   "id": "woodr_hud",
   "title": "Woody HUD",
-  "description": "A menu on the head-up display worked from the steering wheel (the menu button opens and picks, the right roller moves), and shift lights as a border round the Waze map. Hide or show Warm-Up HUD, resize the Waze map, step the ambient colour.",
-  "version": "0.2.3",
+  "description": "A menu on the head-up display worked from the steering wheel (the menu button opens, the right roller moves and its press picks), and shift lights as a border round the Waze map. Hide or show Warm-Up HUD, resize the Waze map, step the ambient colour.",
+  "version": "0.2.4",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",
@@ -17,7 +17,8 @@
     "de.bmw.infotainment.controlelements.SteeringWheelPushButton": {
       "_optional": "the wheel's menu button and right roller that work the HUD menu",
       "statusSpecialFunctionButton": "rs",
-      "statusRotarySteps": "rs"
+      "statusRotarySteps": "rs",
+      "statusRotaryPress": "rs"
     }
   },
   "screens": [
