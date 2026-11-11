@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Woody Cockpit Simulator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* layout: the three car screens in their cockpit positions (head-up over the cluster, centre screen beside), one control panel */
+:root {
+  color-scheme: dark;
+  --bg: #08080a; --panel: #101014; --line: #26262d; --fg: #ececf0; --dim: #9a9ca6; --accent: #ff1f3d; --ink: #050507; --amb: #f4f4f4; --ambo: 0.45;
+  --display: "Chakra Petch", "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", Consolas, monospace;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--display); font-size: 16px; padding-block: 18px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1900px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+header .mark { width: 8px; height: 28px; background: var(--accent); }
+h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+header p { margin: 0; color: var(--dim); font-family: var(--mono); font-size: 13px; letter-spacing: 1px; flex: 1 1 260px; min-width: 0; }
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: end; }
+.stage.stack { grid-template-columns: minmax(0, 1fr); }
+figure { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-family: var(--mono); font-size: 12px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; }
+canvas { display: block; width: 100%; height: auto; max-width: 100%; background: #000; border: 1px solid var(--line); touch-action: manipulation; }
+#f-hud { width: 62%; justify-self: center; }
+/* showreel: one tall 9:16 column for recording, a caption on top, controls hidden */
+.reelcap { width: 100%; background: none; border: 0; padding: 6px 0; min-height: 84px; display: flex; flex-direction: column; justify-content: center; gap: 10px; text-align: center; font-size: 22px; font-weight: 700; letter-spacing: 2px; line-height: 1.25; text-wrap: balance; cursor: pointer; }
+.reelcap:hover { border: 0; }
+.reelbar { height: 3px; background: var(--line); }
+.reelbar i { display: block; height: 3px; width: 0; background: var(--accent); }
+body.reel header, body.reel .panel, body.reel .cabin, body.reel figcaption span:last-child { display: none; }
+body.reel .wrap { max-width: min(100%, calc((100vh - 24px) * 9 / 16)); }
+body.reel .stage { grid-template-columns: minmax(0, 1fr); }
+body.reel #f-hud { width: 72%; }
+.cabin { display: flex; flex-direction: column; gap: 6px; }
+.cabin .lbl { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-family: var(--mono); font-size: 12px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; }
+.cabin .bar { height: 10px; background: var(--amb); box-shadow: 0 0 22px var(--amb); opacity: var(--ambo); }
+.stage.stack #f-hud { width: min(100%, 800px); }
+.panel { background: var(--panel); border: 1px solid var(--line); padding: 14px 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 22px; align-self: stretch; }
+.grp { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.grp h2 { margin: 0; font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 3px; color: var(--dim); text-transform: uppercase; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+button { font-family: var(--display); font-size: 14px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--fg); background: #17171c; border: 1px solid var(--line); padding: 9px 12px; min-height: 40px; cursor: pointer; }
+button:hover { border-color: var(--dim); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+label.sl { display: grid; grid-template-columns: 74px minmax(0, 1fr) 54px; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--dim); }
+label.sl output { color: var(--fg); text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.sw { width: 34px; min-height: 34px; padding: 0; }
+.sw[aria-pressed="true"] { outline: 2px solid var(--fg); outline-offset: 2px; }
+#state { font-family: var(--mono); font-size: 13px; color: var(--fg); line-height: 1.5; }
+.hint { font-family: var(--mono); font-size: 12px; color: var(--dim); line-height: 1.5; margin: 0; }
+@media (max-width: 1000px) { .stage { grid-template-columns: minmax(0, 1fr); } #f-hud { width: min(100%, 800px); } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark"></div>
+    <h1>Woody Cockpit Simulator</h1>
+    <p>Style prototype. All three screens run together on made-up drive data. Click the screens like a touchscreen.</p>
+    <button id="b-layout" aria-pressed="false">Big screens</button>
+    <button id="b-reel">Showreel</button>
+  </header>
+
+  <button class="reelcap" id="reelcap" hidden aria-label="Showreel caption. Press to leave the showreel."><span id="reel-t"></span><span class="reelbar"><i id="reel-p"></i></span></button>
+
+  <div class="cabin">
+    <div class="lbl"><span>Cabin ambient light</span><span id="cabin-t">Your colour</span></div>
+    <div class="bar" id="cabin-bar"></div>
+  </div>
+
+  <div class="stage" id="stage">
+    <figure id="f-hud">
+      <figcaption><span>Head-up display 800 x 480</span><span>Click = wheel menu button, scroll = roller</span></figcaption>
+      <canvas id="hud" width="800" height="480" aria-label="Head-up display"></canvas>
+    </figure>
+
+    <section class="panel" aria-label="Simulator controls">
+      <div class="grp">
+        <h2>Drive</h2>
+        <div class="row"><button id="b-demo" aria-pressed="true">Demo drive</button><button id="b-mode">Gearbox: D</button><button id="b-reset">Reset</button></div>
+        <label class="sl" for="s-rpm">Revs<input type="range" id="s-rpm" min="700" max="7200" step="50" value="900"><output id="o-rpm">900</output></label>
+        <label class="sl" for="s-oil">Oil &deg;C<input type="range" id="s-oil" min="20" max="120" step="1" value="48"><output id="o-oil">48</output></label>
+      </div>
+      <div class="grp">
+        <h2>Phone and lock</h2>
+        <div class="row"><button id="b-phone" aria-pressed="true">Phone in car</button><button id="b-lock">Lock button</button><button id="b-scan">Scan code</button></div>
+        <div class="row"><button id="b-whole" aria-pressed="false">Lock whole unit</button></div>
+        <div id="state" aria-live="polite"></div>
+      </div>
+      <div class="grp">
+        <h2>House and wheel</h2>
+        <div class="row"><button id="b-bell">Ring doorbell</button><button id="b-map">HUD map</button><button id="b-song" aria-pressed="true">Song on HUD</button><button id="b-amb" aria-pressed="true">Lights follow revs</button></div>
+        <div class="row"><button id="b-menu">Wheel menu</button><button id="b-up" aria-label="Roller up">Roller up</button><button id="b-down" aria-label="Roller down">Roller down</button></div>
+      </div>
+      <div class="grp">
+        <h2>New ideas</h2>
+        <div class="row"><button id="b-launch">Launch</button><button id="b-report">Drive report</button></div>
+        <div class="row"><button id="b-valet" aria-pressed="false">Valet mode</button><button id="b-coach" aria-pressed="false">Shift coach</button></div>
+        <p class="hint">Leaving-home guard: drive off with a garage door open.</p>
+      </div>
+      <div class="grp">
+        <h2>Style</h2>
+        <div class="row" id="swatches"></div>
+        <div class="row"><button id="b-guides" aria-pressed="true">BMW areas</button><button id="b-detail" aria-pressed="true">Cyber detail</button></div>
+        <p class="hint">Sample values throughout. Dashed boxes are BMW's own content.</p>
+      </div>
+    </section>
+
+    <figure>
+      <figcaption><span>Instrument cluster 1920 x 720</span><span>Map slot, shift lights, doorbell</span></figcaption>
+      <canvas id="cluster" width="1920" height="720" aria-label="Instrument cluster"></canvas>
+    </figure>
+
+    <figure>
+      <figcaption><span>Centre screen 1920 x 720</span><span>Mouse = touch</span></figcaption>
+      <canvas id="centre" width="1920" height="720" aria-label="Centre screen"></canvas>
+    </figure>
+  </div>
+</div>
+
+<script>
+'use strict';
+var C = { bg: '#050507', panel: '#0b0b0e', line: '#2a2a31', soft: '#1f1f25', text: '#f2f2f4', dim: '#8f9199', mid: '#c9cad0', amber: '#ffb31a', deep: '#140508', btn: '#131317' };
+var DISP = '"Chakra Petch", "Segoe UI", sans-serif', MONO = '"JetBrains Mono", Consolas, monospace';
+var ACCENTS = ['#ff1f3d', '#e1001a', '#ff3b1f', '#ff2d78'];
+var RATIO = [0, 5.2, 8.6, 12.4, 16.5, 20.6];
+var MENU = ['Warm-up', 'Shift lights', 'Map size', 'Next colour'];
+var MAPS = [0, 35, 50, 68], MAPNAME = { 0: 'OFF', 35: 'S', 50: 'M', 68: 'L' };
+function nextMap() { S.hudMap = MAPS[(MAPS.indexOf(S.hudMap) + 1) % MAPS.length]; }
+var APPS = [['home', 'Home', 'Garage, lock, doorbell'], ['vitals', 'M3 Vitals', 'Warm-up and drivetrain'], ['', 'Ambient Studio', 'Not drawn yet'], ['launch', 'Launch', '0 to 60 timer'], ['report', 'Drive Report', 'This drive so far']];
+var S;
+
+function fresh() {
+  return {
+    demo: S ? S.demo : !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
+    accent: S ? S.accent : ACCENTS[0], guides: S ? S.guides : true, detail: S ? S.detail : true, whole: S ? S.whole : false, hudMap: S ? S.hudMap : 50, song: S ? S.song : true, mode: S ? S.mode : 'D', coach: S ? S.coach : false, valet: false, vlog: { v: 0, r: 0, n: 0, over: false, msgAt: -9 }, guard: { arm: 0 },
+    launch: { stage: 'idle', t: 0, go: 0, m: null, last: S ? S.launch.last : null, ft: 0, pv: 0, g: 0 }, stat: { t: 0, vmax: 0, rmax: 0, cold: 0, oil: 0, best: 0 }, amb: { on: S ? S.amb.on : true, stage: 0, shown: 0, at: -9 },
+    now: 0, rpm: 900, gear: 1, speed: 0, phase: 'idle', hold: 2, dist: 0,
+    oil: 48, cool: 40, box: 30, batt: 14.1, tyres: [35, 35, 29, 36],
+    phone: true, hard: false, code: newCode(), codeAt: 0,
+    app: 'home', sel: 1, arm: { i: -1, until: 0 }, toast: null,
+    tiles: [
+      { name: 'Big Garage', tag: 'DOOR 01', kind: 'cover', state: 'closed', pos: 0 },
+      { name: 'Small Garage', tag: 'DOOR 02', kind: 'cover', state: 'open', pos: 1 },
+      { name: 'Front Door', tag: 'LOCK 01', kind: 'lock', state: 'unlocked', pos: 0 }
+    ],
+    bell: 0, bellNext: 14, menu: { open: false, ix: 0, until: 0 }, warmShow: true, shift: true, readyAt: 0
+  };
+}
+function newCode() { var s = ''; for (var i = 0; i < 8; i++) s += '0123456789ABCDEF'[Math.floor(Math.random() * 16)]; return s; }
+function unlocked() { return S.phone && !S.hard; }
+function A() { return S.accent; }
+
+/* ---------- drawing helpers (only what the car can draw: boxes, lines, polygons, arcs, text) ---------- */
+function R(g, x, y, w, h, c) { g.fillStyle = c; g.fillRect(x, y, w, h); }
+function T(g, s, x, y, size, c, o) {
+  o = o || {};
+  g.font = (o.w || 600) + ' ' + size + 'px ' + (o.mono ? MONO : DISP);
+  g.fillStyle = c; g.textAlign = o.a || 'left'; g.textBaseline = o.b || 'alphabetic';
+  try { g.letterSpacing = (o.ls == null ? (o.mono ? 2 : 1) : o.ls) + 'px'; } catch (e) { /* older browsers: no spacing */ }
+  g.fillText(s, x, y);
+}
+function L(g, x1, y1, x2, y2, c, lw) { g.strokeStyle = c; g.lineWidth = lw || 1; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
+function cut(g, x, y, w, h, k, fill, stroke, lw, bl) {
+  g.beginPath(); g.moveTo(x, y); g.lineTo(x + w - k, y); g.lineTo(x + w, y + k); g.lineTo(x + w, y + h);
+  if (bl) { g.lineTo(x + k, y + h); g.lineTo(x, y + h - k); } else g.lineTo(x, y + h);
+  g.closePath();
+  if (fill) { g.fillStyle = fill; g.fill(); }
+  if (stroke) { g.strokeStyle = stroke; g.lineWidth = lw || 1; g.stroke(); }
+}
+function skew(g, x, y, w, h, k, c, l, r) {
+  g.beginPath(); g.moveTo(x + (l ? k : 0), y); g.lineTo(x + w, y); g.lineTo(x + w - (r ? k : 0), y + h); g.lineTo(x, y + h); g.closePath();
+  g.fillStyle = c; g.fill();
+}
+function brackets(g, x, y, w, h, s, c, lw) {
+  g.strokeStyle = c; g.lineWidth = lw || 3; g.beginPath();
+  g.moveTo(x, y + s); g.lineTo(x, y); g.lineTo(x + s, y);
+  g.moveTo(x + w - s, y); g.lineTo(x + w, y); g.lineTo(x + w, y + s);
+  g.moveTo(x + w, y + h - s); g.lineTo(x + w, y + h); g.lineTo(x + w - s, y + h);
+  g.moveTo(x + s, y + h); g.lineTo(x, y + h); g.lineTo(x, y + h - s);
+  g.stroke();
+}
+function segs(g, x, y, w, h, n, on, c, off, gap) {
+  gap = gap == null ? 5 : gap;
+  var sw = (w - gap * (n - 1)) / n;
+  for (var i = 0; i < n; i++) R(g, x + i * (sw + gap), y, sw, h, i < on ? (typeof c === 'function' ? c(i) : c) : off);
+}
+function dashed(g, x, y, w, h, label) {
+  if (!S.guides) return;
+  g.save(); g.setLineDash([8, 8]); g.strokeStyle = '#3a3a42'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w, h); g.restore();
+  if (label) T(g, label, x + 8, y + 18, 13, C.dim, { mono: true, w: 400 });
+}
+function ticks(g, x, y, w, n, c) { if (!S.detail) return; for (var i = 0; i <= n; i++) L(g, x + w * i / n, y, x + w * i / n, y + (i % 5 ? 5 : 10), c, 1); }
+
+/* ---------- screens and mouse ---------- */
+function screen(id) {
+  var cv = document.getElementById(id), sc = { cv: cv, g: cv.getContext('2d'), targets: [], mouse: null };
+  var pos = function (e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; };
+  cv.addEventListener('pointermove', function (e) { sc.mouse = pos(e); });
+  cv.addEventListener('pointerleave', function () { sc.mouse = null; cv.style.cursor = ''; });
+  cv.addEventListener('click', function (e) {
+    var p = pos(e);
+    for (var i = sc.targets.length - 1; i >= 0; i--) { var t = sc.targets[i]; if (p.x >= t.x && p.x <= t.x + t.w && p.y >= t.y && p.y <= t.y + t.h) { t.fn(); return; } }
+  });
+  return sc;
+}
+function hit(sc, x, y, w, h, fn) {
+  sc.targets.push({ x: x, y: y, w: w, h: h, fn: fn });
+  var m = sc.mouse, over = !!m && m.x >= x && m.x <= x + w && m.y >= y && m.y <= y + h;
+  if (over) sc.over = true;
+  return over;
+}
+var centre = screen('centre'), cluster = screen('cluster'), hud = screen('hud');
+hud.cv.addEventListener('wheel', function (e) { e.preventDefault(); roller(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+
+/* ---------- actions ---------- */
+function toast(s) { S.toast = { s: s, until: S.now + 3 }; }
+function offer(t) { return t.kind === 'cover' ? (t.state === 'closed' ? 'open' : t.state === 'open' ? 'close' : null) : (t.state === 'unlocked' ? 'lock' : null); }
+function press() {
+  var t = S.tiles[S.sel], act = offer(t);
+  if (!act) { toast(t.kind === 'lock' ? 'Already locked. The car can never unlock.' : 'Door is moving'); return; }
+  if (S.arm.i === S.sel && S.now < S.arm.until) {
+    S.arm.i = -1;
+    if (t.kind === 'cover') t.state = act === 'open' ? 'opening' : 'closing'; else t.state = 'locked';
+  } else S.arm = { i: S.sel, until: S.now + 4 };
+}
+function ring() { if (unlocked()) S.bell = S.now + 12; else toast('Locked: the doorbell does not show'); }
+function hardLock() { S.hard = true; S.code = newCode(); S.codeAt = S.now; S.bell = 0; }
+function scan() { if (S.hard) { S.hard = false; S.phone = true; } }
+function menuBtn() {
+  var m = S.menu;
+  if (S.valet) return;
+  if (guardOn()) {
+    if (S.now < S.guard.arm) { S.tiles.forEach(function (t) { if (t.kind === 'cover' && t.state === 'open') t.state = 'closing'; }); S.guard.arm = 0; } else S.guard.arm = S.now + 4;
+    return;
+  }
+  if (!m.open) { m.open = true; m.ix = 0; m.until = S.now + 10; return; }
+  m.until = S.now + 10;
+  if (m.ix === 0) S.warmShow = !S.warmShow;
+  else if (m.ix === 1) S.shift = !S.shift;
+  else if (m.ix === 2) nextMap();
+  else S.accent = ACCENTS[(ACCENTS.indexOf(S.accent) + 1) % ACCENTS.length];
+  syncPanel();
+}
+function roller(d) { var m = S.menu; if (!m.open) return; m.ix = (m.ix + d + MENU.length) % MENU.length; m.until = S.now + 10; }
+
+/* ---------- the made-up drive ---------- */
+function update(dt) {
+  S.now += dt;
+  if (S.demo) {
+    if (S.phase === 'accel') { S.rpm += dt * [0, 2600, 1900, 1300, 900, 600][S.gear]; if (S.rpm >= shiftAt() + 150) { if (S.gear < 5) { S.gear++; S.rpm *= 0.66; } else { S.phase = 'cruise'; S.hold = 3; } } }
+    else if (S.phase === 'cruise') { S.rpm += (3200 - S.rpm) * dt * 1.5; S.hold -= dt; if (S.hold <= 0) S.phase = 'brake'; }
+    else if (S.phase === 'brake') { S.rpm -= dt * 1800; if (S.rpm < 1800) { if (S.gear > 1) { S.gear--; S.rpm = Math.min(5200, S.rpm * 1.45); } else { S.phase = 'idle'; S.hold = 2.5; } } }
+    else { S.rpm += ((S.launch.stage === 'tree' ? 3500 : 850) - S.rpm) * dt * (S.launch.stage === 'tree' ? 1.6 : 4); S.hold -= dt; if (S.hold <= 0) S.phase = 'accel'; }
+    S.oil = Math.min(104, S.oil + dt * 0.7); S.cool = Math.min(92, S.cool + dt * 1.2); S.box = Math.min(78, S.box + dt * 0.4);
+  } else { S.gear = 3; S.phase = 'manual'; S.cool = Math.min(92, S.oil + 10); S.box = Math.max(20, S.oil - 30); }
+  S.speed = S.phase === 'idle' ? 0 : S.rpm / 1000 * RATIO[S.gear];
+  S.dist += S.speed * dt * 3;
+  S.batt = 14.1 + Math.sin(S.now * 0.7) * 0.05;
+  S.tiles.forEach(function (t) {
+    if (t.state === 'opening') { t.pos += dt / 6; if (t.pos >= 1) { t.pos = 1; t.state = 'open'; } }
+    if (t.state === 'closing') { t.pos -= dt / 6; if (t.pos <= 0) { t.pos = 0; t.state = 'closed'; } }
+  });
+  if (S.menu.open && S.now > S.menu.until) S.menu.open = false;
+  if (S.hard && S.now - S.codeAt > 180) { S.code = newCode(); S.codeAt = S.now; }
+  if (S.oil >= 100 && !S.readyAt) S.readyAt = S.now;
+  if (S.oil < 100) S.readyAt = 0;
+  if (S.toast && S.now > S.toast.until) S.toast = null;
+  /* this drive's numbers, for the report */
+  var stt = S.stat; stt.t += dt; stt.vmax = Math.max(stt.vmax, S.speed); stt.rmax = Math.max(stt.rmax, S.rpm); stt.oil = Math.max(stt.oil, S.oil); if (S.rpm > safeLimit()) stt.cold += dt;
+  /* valet: keep the worst, message the owner once per crossing */
+  if (S.valet) { var vl = S.vlog, ov = S.speed > 50 || S.rpm > 4000; vl.v = Math.max(vl.v, S.speed); vl.r = Math.max(vl.r, S.rpm); if (ov && !vl.over) { vl.n++; vl.msgAt = S.now; } vl.over = ov; }
+  /* launch: three lights, go, timed to 60 */
+  var la = S.launch;
+  if (la.stage === 'tree') {
+    /* staged once the revs are up; then a second's pause, three lights a second apart, and go */
+    if (!(la.st > la.t) && S.rpm >= 3200) la.st = S.now;
+    if (la.st > la.t && S.now - la.st >= 4) { la.stage = 'go'; la.go = S.now; la.ft = 0; la.pv = 0; la.g = 0; la.m = { ft60: 0, t30: 0, t60: 0, t100: 0, t130: 0, e8: 0, v8: 0, e4: 0, v4: 0, g: 0 }; S.demo = true; S.phase = 'accel'; S.gear = 1; S.rpm = 1000; syncPanel(); }
+    else { S.phase = 'idle'; S.hold = 1; S.gear = 1; }
+  } else if (la.stage === 'go') {
+    /* the timeslip: every mark is stamped the moment speed or distance crosses it; distance is speed added up */
+    var m = la.m, el = S.now - la.go, dv = Math.max(0, Math.min(25, (S.speed - la.pv) / Math.max(dt, 0.001)));
+    la.g += (dv * 0.0456 - la.g) * Math.min(1, dt * 6); m.g = Math.max(m.g, la.g); la.pv = S.speed;
+    la.ft += S.speed * 1.4667 * dt;
+    if (!m.ft60 && la.ft >= 60) m.ft60 = el;
+    if (!m.t30 && S.speed >= 30) m.t30 = el;
+    if (!m.t60 && S.speed >= 60) { m.t60 = el; stt.best = stt.best ? Math.min(stt.best, el) : el; }
+    if (!m.t100 && S.speed >= 100) m.t100 = el;
+    if (!m.t130 && S.speed >= 130) m.t130 = el;
+    if (!m.e8 && la.ft >= 660) { m.e8 = el; m.v8 = S.speed; }
+    if (!m.e4 && la.ft >= 1320) { m.e4 = el; m.v4 = S.speed; }
+    if (S.phase !== 'accel' || el > 30) { la.stage = 'result'; la.t = S.now; la.last = m; }
+  } else if (la.stage === 'result' && S.now - la.t > 20) la.stage = 'idle';
+  /* cabin lights as Ambient Studio drives them: the same steps as the gear, 300 rpm of hold on the way down, one change per 1.5 s */
+  var am = S.amb, starts = [0, 5500, 6300, 6800], st = 0;
+  if (am.on && S.rpm > 400) { for (var q = 3; q >= 1; q--) if (S.rpm >= starts[q]) { st = q; break; } if (st < am.stage && S.rpm >= starts[am.stage] - 300) st = am.stage; }
+  am.stage = st;
+  if (am.stage !== am.shown && S.now - am.at >= 1.5) { am.shown = am.stage; am.at = S.now; }
+}
+/* shift coach: a shift point per gear (sample numbers standing in for ones learned from your logs); off = 6800 in every gear */
+var COACH = [0, 6900, 6800, 6600, 6400, 6200];
+function shiftAt() { return S.coach ? COACH[S.gear] : 6800; }
+function rpmColour() { var r = S.rpm, sa = shiftAt(); return r >= sa ? (Math.floor(S.now * 10) % 2 ? A() : '#000000') : r >= sa - 500 ? A() : r >= sa - 1300 ? C.amber : r >= sa - 2800 ? C.text : null; }
+function guardOn() { return unlocked() && !S.valet && S.speed > 8 && S.tiles.some(function (t) { return t.kind === 'cover' && (t.state === 'open' || t.state === 'opening'); }); }
+function safeLimit() { return S.oil < 60 ? 4000 : S.oil < 80 ? 5000 : S.oil < 100 ? 6000 : 7200; }
+
+/* ---------- centre screen ---------- */
+function chrome(sc, title, sub, chips, buttons) {
+  var g = sc.g;
+  R(g, 0, 0, 1920, 720, C.bg);
+  L(g, 96.5, 0, 96.5, 720, '#1c1c22');
+  var ov = hit(sc, 0, 0, 96, 720, function () { S.app = 'picker'; });
+  g.strokeStyle = ov ? C.text : C.dim; g.lineWidth = 3; g.beginPath(); g.moveTo(56, 34); g.lineTo(40, 54); g.lineTo(56, 74); g.stroke();
+  R(g, 47, 620, 2, 64, A());
+  L(g, 96, 76.5, 1920, 76.5, '#1c1c22');
+  R(g, 136, 21, 10, 34, A());
+  T(g, title.toUpperCase(), 164, 50, 32, C.text, { w: 700, ls: 3 });
+  var tw = g.measureText(title.toUpperCase()).width;
+  if (S.detail && sub) T(g, '// ' + sub, 164 + tw + 26, 47, 17, C.dim, { mono: true, w: 400 });
+  var x = 1880;
+  chips.forEach(function (c) {
+    T(g, c[0], x, 46, 17, c[1] ? C.text : C.dim, { mono: true, w: 500, a: 'right' });
+    x -= g.measureText(c[0]).width + 20;
+    if (c[1]) R(g, x, 34, 10, 10, A()); else { g.strokeStyle = C.dim; g.lineWidth = 2; g.strokeRect(x + 1, 35, 8, 8); }
+    x -= 34;
+  });
+  L(g, 96, 655.5, 1920, 655.5, '#1c1c22');
+  var n = buttons.length, bw = (1744 - 2 * (n - 1)) / n;
+  buttons.forEach(function (b, i) {
+    var bx = 136 + i * (bw + 2), over = hit(sc, bx, 656, bw, 64, b[1]);
+    skew(g, bx, 656, bw, 64, 18, b[2] ? A() : over ? '#22222a' : C.btn, i > 0, i < n - 1);
+    T(g, b[0], bx + bw / 2, 697, 22, b[2] ? C.bg : C.text, { w: b[2] ? 700 : 600, ls: 3, a: 'center' });
+  });
+  if (S.toast) { var w = 760; R(g, 960 - w / 2 + 48, 596, w, 48, C.bg); cut(g, 960 - w / 2 + 48, 596, w, 48, 14, C.deep, A(), 2); T(g, S.toast.s, 1008, 628, 21, C.text, { a: 'center', w: 500 }); }
+}
+function drawCamera(g, x, y, w, h) {
+  R(g, x, y, w, h, '#0a0a0d');
+  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+  R(g, x, y + h * 0.78, w, h * 0.22, '#141418');
+  g.strokeStyle = '#34343c'; g.lineWidth = 3; g.strokeRect(x + w * 0.62, y + h * 0.12, w * 0.26, h * 0.66);
+  var cx = x + w * 0.36 + Math.sin(S.now * 1.3) * 4, cy = y + h * 0.4;
+  g.fillStyle = '#5a5c66'; g.beginPath(); g.arc(cx, cy, h * 0.11, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.moveTo(cx - h * 0.24, y + h); g.lineTo(cx - h * 0.2, cy + h * 0.2); g.lineTo(cx + h * 0.2, cy + h * 0.2); g.lineTo(cx + h * 0.24, y + h); g.closePath(); g.fill();
+  if (S.detail) for (var i = 0; i < h; i += 6) R(g, x, y + i, w, 1, 'rgba(0,0,0,0.35)');
+  g.restore();
+  R(g, x + 12, y + 12, 10, 10, Math.floor(S.now * 2) % 2 ? A() : '#000000');
+  T(g, 'LIVE // SAMPLE PICTURE', x + 30, y + 23, 14, C.text, { mono: true, w: 500 });
+  brackets(g, x, y, w, h, 24, A(), 3);
+}
+function drawHome(sc) {
+  var g = sc.g, t0 = S.tiles[S.sel], act = offer(t0);
+  chrome(sc, 'Home', 'HOUSE LINK', [['LINK OK', false], ['PHONE IN CAR', true]], [
+    [act ? act.toUpperCase() + (t0.kind === 'cover' ? ' DOOR' : ' DOOR') : 'NO ACTION', press, !!act],
+    ['NEXT TILE', function () { S.sel = (S.sel + 1) % 3; S.arm.i = -1; }],
+    ['LOCK APP', hardLock], ['VITALS', function () { S.app = 'vitals'; }]]);
+  S.tiles.forEach(function (t, i) {
+    var x = 136 + i * 424, y = 104, w = 400, h = 528, sel = S.sel === i;
+    var hot = t.state !== 'closed' && t.state !== 'locked', a = offer(t), armed = S.arm.i === i && S.now < S.arm.until;
+    var over = hit(sc, x, y, w, h, function () { if (S.sel !== i) { S.sel = i; S.arm.i = -1; } else press(); });
+    cut(g, x, y, w, h, 26, sel ? C.deep : over ? '#101014' : C.panel, sel ? A() : over ? C.dim : C.line, sel ? 3 : 1, true);
+    T(g, t.tag, x + 28, y + 46, 16, sel ? C.mid : C.dim, { mono: true, w: 400, ls: 3 });
+    T(g, sel ? 'SELECTED' : t.kind === 'lock' ? 'LOCK ONLY' : 'COVER', x + w - 44, y + 46, 16, sel ? C.mid : C.dim, { mono: true, w: 400, ls: 3, a: 'right' });
+    T(g, t.name.toUpperCase(), x + 28, y + 100, 30, C.text, { ls: 2 });
+    T(g, t.state.toUpperCase(), x + 28, y + 176, 62, hot ? A() : C.text, { w: 700, ls: 2 });
+    if (t.kind === 'cover') {
+      segs(g, x + 28, y + 206, w - 56, 14, 10, Math.round(t.pos * 10), A(), C.soft, 6);
+      ticks(g, x + 28, y + 226, w - 56, 10, C.dim);
+      var dy = y + 270, dw = w - 56, dh = 150;
+      g.strokeStyle = C.line; g.lineWidth = 2; g.strokeRect(x + 28, dy, dw, dh);
+      var open = t.pos * (dh - 8);
+      for (var k = 0; k < 5; k++) { var py = dy + 4 + k * (dh - 8) / 5 - open; if (py + 24 > dy) R(g, x + 34, Math.max(dy + 4, py), dw - 12, Math.min(24, py + 24 - dy - 4), hot ? '#3a0c14' : '#1a1a20'); }
+    } else {
+      var lx = x + 28, ly = y + 250;
+      g.strokeStyle = hot ? A() : C.text; g.lineWidth = 5; g.strokeRect(lx + 10, ly + 60, 100, 76);
+      g.beginPath(); if (t.state === 'locked') { g.moveTo(lx + 30, ly + 60); g.lineTo(lx + 30, ly + 34); g.arc(lx + 60, ly + 34, 30, Math.PI, 0); g.lineTo(lx + 90, ly + 60); } else { g.moveTo(lx + 30, ly + 44); g.lineTo(lx + 30, ly + 34); g.arc(lx + 60, ly + 34, 30, Math.PI, 0); g.lineTo(lx + 90, ly + 60); } g.stroke();
+      T(g, 'THE CAR CAN NEVER', lx + 140, ly + 90, 16, C.dim, { mono: true, w: 400 }); T(g, 'UNLOCK THIS DOOR', lx + 140, ly + 114, 16, C.dim, { mono: true, w: 400 });
+    }
+    if (armed) { R(g, x + 28, y + h - 62, 52, 32, A()); T(g, '2x', x + 54, y + h - 39, 20, C.bg, { w: 700, a: 'center', mono: true, ls: 0 }); T(g, 'PRESS AGAIN TO ' + a.toUpperCase(), x + 94, y + h - 39, 17, C.text, { mono: true, w: 500 }); }
+    else T(g, a ? 'PRESS TO ' + a.toUpperCase() : t.kind === 'lock' ? 'NOTHING TO DO' : 'MOVING', x + 56, y + h - 39, 17, C.dim, { mono: true, w: 400 });
+  });
+  var cx = 1408, cw = 472;
+  T(g, 'CAM // FRONT DOOR', cx, 122, 16, C.dim, { mono: true, w: 400, ls: 3 });
+  T(g, 'STILL 1/S', cx + cw, 122, 16, C.dim, { mono: true, w: 400, ls: 3, a: 'right' });
+  if (S.bell > S.now) { drawCamera(g, cx, 140, cw, 420); segs(g, cx, 578, cw, 10, 24, Math.ceil((S.bell - S.now) / 12 * 24), A(), C.soft); T(g, 'DOORBELL RINGING', cx, 622, 20, A(), { w: 700, ls: 3 }); }
+  else {
+    R(g, cx, 140, cw, 420, C.panel); g.strokeStyle = C.line; g.lineWidth = 1; g.strokeRect(cx + 0.5, 140.5, cw, 420); brackets(g, cx, 140, cw, 420, 24, A(), 3);
+    T(g, 'NO ONE AT THE DOOR', cx + cw / 2, 344, 18, C.dim, { mono: true, w: 400, a: 'center' }); T(g, 'the picture shows when the bell rings', cx + cw / 2, 372, 15, C.dim, { mono: true, w: 400, a: 'center', ls: 0 });
+    T(g, 'IDLE', cx, 622, 20, C.dim, { w: 600, ls: 3 });
+  }
+}
+function gauge(g, x, y, w, h, label, right, val, unit, frac, hot) {
+  cut(g, x, y, w, h, 22, C.panel, C.line, 1, false);
+  T(g, label, x + 24, y + 38, 16, C.dim, { mono: true, w: 400, ls: 3 }); T(g, right, x + w - 38, y + 38, 16, hot ? A() : C.dim, { mono: true, w: 400, ls: 3, a: 'right' });
+  T(g, val, x + 24, y + 116, 76, hot ? A() : C.text, { w: 700, ls: 1 });
+  var vw = g.measureText(val).width; T(g, unit, x + 36 + vw, y + 116, 22, C.dim, { mono: true, w: 400 });
+  segs(g, x + 24, y + h - 34, w - 48, 12, 14, Math.round(Math.max(0, Math.min(1, frac)) * 14), hot ? A() : C.text, C.soft);
+}
+function drawVitals(sc) {
+  var g = sc.g, warm = S.oil >= 100, lim = safeLimit();
+  chrome(sc, 'M3 Vitals', 'WARM-UP', [['SAMPLE VALUES', false], [warm ? 'READY' : 'WARMING', !warm]], [
+    ['HOME', function () { S.app = 'home'; }, true], ['HEAD-UP ' + (S.warmShow ? 'ON' : 'OFF'), function () { S.warmShow = !S.warmShow; }], ['SHIFT LIGHTS ' + (S.shift ? 'ON' : 'OFF'), function () { S.shift = !S.shift; }], ['RING BELL', ring]]);
+  T(g, 'ENGINE // RPM', 136, 122, 16, C.dim, { mono: true, w: 400, ls: 3 }); T(g, 'SAFE LIMIT ' + lim, 756, 122, 16, S.rpm > lim ? A() : C.dim, { mono: true, w: 400, ls: 3, a: 'right' });
+  T(g, String(Math.round(S.rpm / 10) * 10), 136, 250, 132, S.rpm > lim ? A() : C.text, { w: 700, ls: 2 });
+  T(g, 'GEAR', 560, 190, 18, C.dim, { mono: true, w: 400, ls: 3 }); T(g, gearText(), 560, 250, 64, A(), { w: 700 });
+  T(g, Math.round(S.speed) + ' MPH', 756, 192, 24, C.mid, { a: 'right' });
+  var n = 36, bw = (620 - 4 * (n - 1)) / n, on = Math.round(S.rpm / 7200 * n), rc = rpmColour();
+  for (var i = 0; i < n; i++) { var bh = 22 + i * 1.0, lit = i < on; R(g, 136 + i * (bw + 4), 330 - bh, bw, bh, lit ? (rc || C.text) : i / n * 7200 >= lim ? '#5c0a16' : C.soft); }
+  ticks(g, 136, 336, 620, 36, C.dim);
+  ['0', '2', '4', '6', '7.2'].forEach(function (s, i2) { T(g, s, 136 + [0, 172, 344, 517, 620][i2], 368, 16, C.dim, { mono: true, w: 400, a: i2 === 4 ? 'right' : i2 ? 'center' : 'left', ls: 0 }); });
+  g.strokeStyle = C.line; g.lineWidth = 1; g.strokeRect(136.5, 560.5, 620, 64); brackets(g, 136, 560, 620, 64, 16, A(), 3);
+  R(g, 152, 576, warm ? 96 : 132, 32, warm ? C.text : A()); T(g, warm ? 'READY' : 'WARMING', 152 + (warm ? 48 : 66), 599, 19, C.bg, { w: 700, a: 'center', ls: 2 });
+  T(g, warm ? 'Oil is at temperature.' : 'Oil is cold. Keep revs under ' + lim + '.', (warm ? 264 : 300), 600, 22, C.text, { w: 500 });
+  var gx = 780, gw = 404, gh = 250;
+  gauge(g, gx, 104, gw, gh, 'OIL TEMP', warm ? 'READY' : 'TARGET 100', String(Math.round(S.oil)), '°C', (S.oil - 20) / 90, !warm);
+  gauge(g, gx + gw + 18, 104, gw, gh, 'COOLANT', S.cool >= 80 ? 'READY' : 'WARMING', String(Math.round(S.cool)), '°C', (S.cool - 20) / 80, false);
+  gauge(g, gx, 104 + gh + 18, gw, gh, 'GEARBOX', S.box >= 60 ? 'READY' : 'WARMING', String(Math.round(S.box)), '°C', (S.box - 10) / 80, false);
+  gauge(g, gx + gw + 18, 104 + gh + 18, gw, gh, '12 V BATTERY', 'CHARGING', S.batt.toFixed(1), 'V', (S.batt - 11) / 4, false);
+  var tx = 1630;
+  T(g, 'TYRES // PSI', tx, 122, 16, C.dim, { mono: true, w: 400, ls: 3 });
+  ['FL', 'FR', 'RL', 'RR'].forEach(function (nm, i3) {
+    var x = tx + (i3 % 2) * 131, y = 140 + Math.floor(i3 / 2) * 250, low = S.tyres[i3] < 31;
+    R(g, x, y, 119, 238, low ? C.deep : C.bg); g.strokeStyle = low ? A() : C.line; g.lineWidth = low ? 2 : 1; g.strokeRect(x + 0.5, y + 0.5, 118, 237);
+    T(g, low ? nm + ' LOW' : nm, x + 60, y + 96, 15, low ? C.text : C.dim, { mono: true, w: 400, a: 'center' }); T(g, String(S.tyres[i3]), x + 60, y + 150, 44, low ? A() : C.text, { w: 700, a: 'center' });
+  });
+}
+function qrCell(i, j, n) {
+  var f = function (a, b) { var m = Math.max(Math.abs(a - 3), Math.abs(b - 3)); return m <= 3 ? (m !== 2) : null; };
+  var v = null;
+  if (i < 8 && j < 8) v = f(i, j); else if (i >= n - 8 && j < 8) v = f(i - (n - 7), j); else if (i < 8 && j >= n - 8) v = f(i, j - (n - 7));
+  if (v !== null && (i < 7 || i >= n - 7) && (j < 7 || j >= n - 7)) return v;
+  if (v === null || true) { var h = 0, s = S.code + ':' + i + ':' + j; for (var k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) >>> 0; if ((i < 8 && j < 8) || (i >= n - 8 && j < 8) || (i < 8 && j >= n - 8)) return false; return (h >> 3) % 2 === 0; }
+}
+function drawLogo(g, cx, cy, r) {
+  var hex = function (rr) { g.beginPath(); for (var i = 0; i < 6; i++) { var a = Math.PI / 180 * (60 * i - 90); g[i ? 'lineTo' : 'moveTo'](cx + rr * Math.cos(a), cy + rr * Math.sin(a)); } g.closePath(); };
+  if (S.detail) { hex(r); g.strokeStyle = C.line; g.lineWidth = 2; g.stroke(); L(g, cx - r - 24, cy, cx - r * 0.9, cy, A(), 3); L(g, cx + r * 0.9, cy, cx + r + 24, cy, A(), 3); }
+  hex(r * 0.86); g.strokeStyle = A(); g.lineWidth = 5; g.stroke();
+  g.strokeStyle = C.text; g.lineWidth = r * 0.1; g.lineJoin = 'miter'; g.beginPath();
+  g.moveTo(cx - r * 0.42, cy - r * 0.3); g.lineTo(cx - r * 0.23, cy + r * 0.33); g.lineTo(cx, cy - r * 0.16); g.lineTo(cx + r * 0.23, cy + r * 0.33); g.lineTo(cx + r * 0.42, cy - r * 0.3); g.stroke();
+}
+function drawLock(sc) {
+  var g = sc.g;
+  R(g, 0, 0, 1920, 720, C.bg);
+  brackets(g, 40, 36, 1840, 648, 60, A(), 3);
+  if (S.detail) {
+    T(g, S.whole ? 'SYSTEM LOCKED' : 'HOME APP LOCKED', 130, 62, 17, C.dim, { mono: true, w: 400, ls: 4 });
+    T(g, S.hard ? 'SCAN REQUIRED' : 'NO APPROVED PHONE', 1790, 62, 17, C.dim, { mono: true, w: 400, ls: 4, a: 'right' });
+    T(g, S.whole ? 'REVERSE CAMERA AND WARNINGS ALWAYS SHOW' : 'THE REST OF THE CAR WORKS AS NORMAL', 130, 672, 17, C.dim, { mono: true, w: 400, ls: 4 });
+  }
+  if (!S.whole) { var ov = hit(sc, 0, 100, 120, 520, function () { S.app = 'picker'; }); g.strokeStyle = ov ? C.text : C.dim; g.lineWidth = 3; g.beginPath(); g.moveTo(84, 340); g.lineTo(68, 360); g.lineTo(84, 380); g.stroke(); }
+  var lx = S.hard ? 560 : 960;
+  drawLogo(g, lx, 330, 150);
+  T(g, '[YOUR LOGO]', lx, 548, 30, C.text, { w: 700, ls: 12, a: 'center' });
+  if (!S.hard) { T(g, 'Connect an approved phone to unlock', 960, 610, 22, C.dim, { a: 'center', w: 500 }); return; }
+  L(g, 860, 170, 860, 550, '#1c1c22', 2);
+  R(g, 960, 150, 136, 40, A()); T(g, 'LOCKED', 1028, 179, 22, C.bg, { w: 700, ls: 4, a: 'center' }); L(g, 1112, 170, 1520, 170, C.line);
+  var qx = 960, qy = 216, qs = 252, n = 25, cs = (qs - 24) / n;
+  var over = hit(sc, qx, qy, qs, qs, scan);
+  R(g, qx, qy, qs, qs, C.text);
+  for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) if (qrCell(i, j, n)) R(g, qx + 12 + i * cs, qy + 12 + j * cs, cs + 0.5, cs + 0.5, C.bg);
+  if (over) { g.strokeStyle = A(); g.lineWidth = 4; g.strokeRect(qx - 6, qy - 6, qs + 12, qs + 12); }
+  T(g, 'Scan with your', 1244, 262, 30, C.text, { ls: 2 }); T(g, 'phone to unlock', 1244, 300, 30, C.text, { ls: 2 });
+  T(g, 'OR TYPE THE CODE', 1244, 350, 17, C.dim, { mono: true, w: 400, ls: 3 });
+  T(g, S.code.slice(0, 4) + ' ' + S.code.slice(4), 1244, 404, 40, A(), { mono: true, w: 700, ls: 5 });
+  T(g, 'in this simulator: click the QR code', 1244, 446, 15, C.dim, { mono: true, w: 400, ls: 0 });
+  var left = Math.max(0, 180 - (S.now - S.codeAt));
+  T(g, 'CODE EXPIRES', 960, 514, 16, C.dim, { mono: true, w: 400, ls: 3 }); T(g, Math.floor(left / 60) + ':' + ('0' + Math.floor(left % 60)).slice(-2), 1520, 514, 16, C.dim, { mono: true, w: 400, ls: 3, a: 'right' });
+  segs(g, 960, 526, 560, 10, 24, Math.ceil(left / 180 * 24), A(), C.soft);
+}
+function drawPicker(sc) {
+  var g = sc.g;
+  chrome(sc, 'Woody Apps', 'INSTALLED', [[unlocked() ? 'UNLOCKED' : 'LOCKED', !unlocked()]], [['HOME', function () { S.app = 'home'; }, true], ['VITALS', function () { S.app = 'vitals'; }], ['LOCK', hardLock], ['RING BELL', ring]]);
+  APPS.forEach(function (a, i) {
+    var x = 136 + i * 352, y = 150, w = 328, h = 360, live = !!a[0];
+    var over = live && hit(sc, x, y, w, h, function () { S.app = a[0]; });
+    cut(g, x, y, w, h, 26, over ? C.deep : C.panel, over ? A() : C.line, over ? 3 : 1, true);
+    brackets(g, x + 104, y + 70, 120, 120, 22, live ? A() : C.line, 3);
+    T(g, a[1].charAt(0), x + 164, y + 152, 64, live ? C.text : C.dim, { w: 700, a: 'center' });
+    T(g, a[1].toUpperCase(), x + 28, y + 262, 26, live ? C.text : C.dim, { ls: 2 });
+    T(g, a[2].toUpperCase(), x + 28, y + 300, 15, C.dim, { mono: true, w: 400 });
+  });
+}
+/* the launch animation: a grid floor rushing at you, streaks flying out of the vanishing point, two light trails. Lines only. */
+function tronGrid(g, x, y, w, h, sp, solid) {
+  var a = A(), cx = x + w / 2, hy = y + h * 0.46, t = S.now * sp, i;
+  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+  if (solid) R(g, x, y, w, h, '#030305');
+  g.strokeStyle = a; g.lineWidth = 2;
+  for (i = -14; i <= 14; i++) { g.globalAlpha = 0.25 + 0.5 * (1 - Math.abs(i) / 14); g.beginPath(); g.moveTo(cx + i * w * 0.012, hy); g.lineTo(cx + i * w * 0.16, y + h); g.stroke(); }
+  for (i = 0; i < 12; i++) { var z = ((i + t) % 12) / 12, yy = hy + (y + h - hy) * z * z; g.globalAlpha = 0.15 + 0.85 * z; g.lineWidth = 1 + 3 * z; g.beginPath(); g.moveTo(x, yy); g.lineTo(x + w, yy); g.stroke(); }
+  for (i = 0; i < 46; i++) {
+    var ang = Math.PI + ((i * 0.6180339) % 1) * Math.PI, r0 = (i * 0.37 + t * 0.35) % 1, r1 = r0 + 0.04 + 0.1 * r0 * Math.min(2, sp), d0 = r0 * r0 * w * 0.6, d1 = r1 * r1 * w * 0.6;
+    g.globalAlpha = Math.min(1, 0.2 + r0); g.strokeStyle = i % 5 ? C.text : a; g.lineWidth = 1 + 2 * r0;
+    g.beginPath(); g.moveTo(cx + Math.cos(ang) * d0, hy + Math.sin(ang) * d0 * 0.6); g.lineTo(cx + Math.cos(ang) * d1, hy + Math.sin(ang) * d1 * 0.6); g.stroke();
+  }
+  g.globalAlpha = 1; R(g, x, hy - 1, w, 3, a);
+  g.lineWidth = 5; g.strokeStyle = C.text; g.beginPath(); g.moveTo(cx - w * 0.2, y + h); g.lineTo(cx - w * 0.015, hy + 4); g.stroke();
+  g.strokeStyle = a; g.beginPath(); g.moveTo(cx + w * 0.2, y + h); g.lineTo(cx + w * 0.015, hy + 4); g.stroke();
+  g.restore();
+}
+function treeLit() { var la = S.launch; return la.st > la.t ? Math.max(0, Math.min(3, Math.floor(S.now - la.st))) : 0; }
+function launchSlip(g, la) {
+  var m = la.stage === 'go' || la.stage === 'result' ? la.m : la.last, x = 1320, y = 104, w = 560, h = 528, res = la.stage === 'result';
+  cut(g, x, y, w, h, 26, C.bg, res ? A() : C.line, res ? 3 : 1, true);
+  T(g, la.stage === 'go' ? 'THIS RUN' : res ? 'TIMESLIP' : 'LAST RUN', x + 28, y + 46, 22, C.text, { w: 700, ls: 4 });
+  T(g, 'SAMPLE', x + w - 44, y + 44, 15, C.dim, { mono: true, w: 400, a: 'right', ls: 3 });
+  if (!m) { T(g, 'NO RUN YET', x + w / 2, y + 280, 22, C.dim, { mono: true, w: 400, a: 'center', ls: 3 }); return; }
+  var f = function (t) { return t ? t.toFixed(2) + ' s' : '--'; };
+  [['60 FT', f(m.ft60)], ['0 - 30 MPH', f(m.t30)], ['0 - 60 MPH', f(m.t60)], ['0 - 100 MPH', f(m.t100)],
+    ['60 - 130 MPH', m.t130 && m.t60 ? (m.t130 - m.t60).toFixed(2) + ' s' : '--'],
+    ['1/8 MILE', m.e8 ? m.e8.toFixed(2) + ' @ ' + Math.round(m.v8) : '--'], ['1/4 MILE', m.e4 ? m.e4.toFixed(2) + ' @ ' + Math.round(m.v4) : '--'],
+    ['PEAK G', m.g ? m.g.toFixed(2) + ' g' : '--']].forEach(function (r, i) {
+    var ry = y + 74 + i * 54, done = r[1] !== '--';
+    L(g, x + 28, ry + 0.5, x + w - 28, ry + 0.5, C.soft, 1);
+    T(g, r[0], x + 28, ry + 38, 19, done ? C.mid : C.dim, { mono: true, w: 500, ls: 2 });
+    T(g, r[1], x + w - 28, ry + 40, 32, !done ? C.dim : i === 2 || i === 6 ? A() : C.text, { w: 700, a: 'right', ls: 1 });
+  });
+}
+function drawLaunch(sc) {
+  var g = sc.g, la = S.launch, rest = la.stage === 'idle' || la.stage === 'result', cx = 700;
+  chrome(sc, 'Launch', '0 TO 60', [['SAMPLE RUN', false], [la.stage.toUpperCase(), !rest]], [
+    [rest ? 'ARM LAUNCH' : 'CANCEL', function () { if (rest) { la.stage = 'tree'; la.t = S.now; } else la.stage = 'idle'; }, true],
+    ['HOME', function () { S.app = 'home'; }], ['VITALS', function () { S.app = 'vitals'; }], ['DRIVE REPORT', function () { S.app = 'report'; }]]);
+  tronGrid(g, 97, 77, 1823, 578, la.stage === 'go' ? 1 + S.speed / 12 : la.stage === 'tree' ? 0.6 : 0.25, true);
+  launchSlip(g, la);
+  if (la.stage === 'idle') {
+    T(g, 'LAUNCH', cx, 250, 120, C.text, { w: 700, a: 'center', ls: 24 });
+    T(g, 'ARM, HOLD THE BRAKE, BUILD REVS', cx, 300, 20, A(), { mono: true, w: 500, a: 'center', ls: 4 });
+  } else if (la.stage === 'tree') {
+    var lit = treeLit();
+    for (var i = 0; i < 3; i++) { if (i < lit) R(g, cx - 330 + i * 240, 140, 180, 120, A()); else { R(g, cx - 330 + i * 240, 140, 180, 120, C.bg); g.strokeStyle = C.dim; g.lineWidth = 3; g.strokeRect(cx - 330 + i * 240, 140, 180, 120); } }
+    T(g, S.launch.st > S.launch.t ? 'HOLD' : 'BUILD REVS', cx, 330, 40, C.text, { w: 700, a: 'center', ls: 16 });
+  } else {
+    T(g, la.stage === 'go' ? (S.now - la.go).toFixed(2) : (la.m.e4 ? la.m.e4.toFixed(2) : la.m.t60 ? la.m.t60.toFixed(2) : '--'), cx, 290, 170, la.stage === 'go' ? C.text : A(), { w: 700, a: 'center', ls: 2 });
+    T(g, la.stage === 'go' ? Math.round(S.speed) + ' MPH  //  ' + gearText() : (la.m.e4 ? 'QUARTER MILE, SECONDS' : '0 TO 60 MPH, SECONDS'), cx, 132, 24, la.stage === 'go' ? A() : C.text, { mono: true, w: 500, a: 'center', ls: 4 });
+  }
+}
+function drawValet(sc) {
+  var g = sc.g, vl = S.vlog;
+  R(g, 0, 0, 1920, 720, C.bg); brackets(g, 40, 36, 1840, 648, 60, A(), 3);
+  R(g, 130, 96, 150, 44, A()); T(g, 'VALET', 205, 128, 24, C.bg, { w: 700, a: 'center', ls: 4 });
+  T(g, 'This car is in valet mode', 310, 130, 30, C.text, { w: 600, ls: 2 });
+  T(g, 'LIMITS 50 MPH // 4000 RPM (SAMPLE)', 1790, 126, 17, C.dim, { mono: true, w: 400, a: 'right', ls: 3 });
+  gauge(g, 130, 190, 520, 250, 'TOP SPEED', vl.v > 50 ? 'OVER LIMIT' : 'OK', String(Math.round(vl.v)), 'MPH', vl.v / 100, vl.v > 50);
+  gauge(g, 700, 190, 520, 250, 'TOP REVS', vl.r > 4000 ? 'OVER LIMIT' : 'OK', String(Math.round(vl.r / 10) * 10), 'RPM', vl.r / 7200, vl.r > 4000);
+  gauge(g, 1270, 190, 520, 250, 'LIMIT CROSSINGS', vl.n ? 'OWNER TOLD' : 'NONE', String(vl.n), '', vl.n / 10, vl.n > 0);
+  if (S.now - vl.msgAt < 4) { cut(g, 130, 480, 1660, 64, 18, C.deep, A(), 3, false); T(g, 'LIMIT CROSSED: MESSAGE SENT TO THE OWNER\'S PHONE', 960, 522, 24, C.text, { w: 700, a: 'center', ls: 3 }); }
+  else T(g, 'House, apps and settings are hidden. Cluster and head-up display show speed only. Reverse camera and warnings still show.', 960, 522, 22, C.dim, { w: 500, a: 'center' });
+  var ov = hit(sc, 660, 580, 600, 64, function () { if (unlocked()) { S.valet = false; syncPanel(); } });
+  skew(g, 660, 580, 600, 64, 18, ov ? A() : C.btn, true, true);
+  T(g, unlocked() ? 'OWNER: END VALET MODE' : 'NEEDS THE OWNER\'S PHONE', 960, 621, 22, ov ? C.bg : C.text, { w: 700, a: 'center', ls: 3 });
+}
+function drawReport(sc) {
+  var g = sc.g, st = S.stat, mm = Math.floor(st.t / 60) + ':' + ('0' + Math.floor(st.t % 60)).slice(-2);
+  chrome(sc, 'Drive Report', 'THIS DRIVE SO FAR', [['SAMPLE VALUES', false]], [['HOME', function () { S.app = 'home'; }, true], ['VITALS', function () { S.app = 'vitals'; }], ['LAUNCH', function () { S.app = 'launch'; }],
+    ['NEW DRIVE', function () { S.stat = { t: 0, vmax: 0, rmax: 0, cold: 0, oil: 0, best: 0 }; }]]);
+  var w = 565, h = 232, cell = function (i) { return [136 + (i % 3) * (w + 24), 104 + Math.floor(i / 3) * (h + 18)]; }, p;
+  p = cell(0); gauge(g, p[0], p[1], w, h, 'DRIVE TIME', 'MIN:SEC', mm, '', st.t / 600, false);
+  p = cell(1); gauge(g, p[0], p[1], w, h, 'TOP SPEED', '', String(Math.round(st.vmax)), 'MPH', st.vmax / 160, false);
+  p = cell(2); gauge(g, p[0], p[1], w, h, 'TOP REVS', '', String(Math.round(st.rmax / 10) * 10), 'RPM', st.rmax / 7200, false);
+  p = cell(3); gauge(g, p[0], p[1], w, h, 'PEAK OIL', st.oil >= 100 ? 'REACHED TEMP' : 'NEVER WARM', String(Math.round(st.oil)), '°C', (st.oil - 20) / 90, false);
+  p = cell(4); gauge(g, p[0], p[1], w, h, 'REVVED WHILE COLD', st.cold > 1 ? 'EASY ON IT' : 'CLEAN', st.cold.toFixed(0), 'S', st.cold / 30, st.cold > 1);
+  p = cell(5); gauge(g, p[0], p[1], w, h, 'BEST 0 TO 60', st.best ? 'THIS DRIVE' : 'NO RUN YET', st.best ? st.best.toFixed(2) : '--', 'S', st.best ? 1 - st.best / 8 : 0, false);
+  T(g, 'ON THE CAR THIS IS SENT TO HOME ASSISTANT WHEN THE DRIVE ENDS', 1008, 630, 15, C.dim, { mono: true, w: 400, a: 'center' });
+}
+function drawCentre() {
+  var sc = centre; sc.targets = []; sc.over = false;
+  if (S.valet) drawValet(sc);
+  else if (!unlocked() && (S.whole || S.app === 'home')) drawLock(sc);
+  else if (S.app === 'launch') drawLaunch(sc);
+  else if (S.app === 'report') drawReport(sc);
+  else if (S.app === 'vitals') drawVitals(sc);
+  else if (S.app === 'picker') drawPicker(sc);
+  else drawHome(sc);
+  sc.cv.style.cursor = sc.over ? 'pointer' : '';
+}
+
+/* ---------- instrument cluster ---------- */
+function dial(g, cx, cy, r, frac, label, big, small) {
+  var a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+  g.lineWidth = 10; g.strokeStyle = '#1c1c22'; g.beginPath(); g.arc(cx, cy, r, a0, a1); g.stroke();
+  g.strokeStyle = '#6a6c76'; g.beginPath(); g.arc(cx, cy, r, a0, a0 + (a1 - a0) * Math.max(0, Math.min(1, frac))); g.stroke();
+  T(g, big, cx, cy + 26, 84, '#d8d9de', { w: 600, a: 'center' }); T(g, small, cx, cy + 66, 20, C.dim, { mono: true, w: 400, a: 'center' });
+  if (S.guides) T(g, label, cx, cy + r + 44, 14, C.dim, { mono: true, w: 400, a: 'center' });
+}
+function drawCluster() {
+  var g = cluster.g, mx = 416, my = 120, mw = 1088, mh = 480;
+  R(g, 0, 0, 1920, 720, '#020203');
+  dial(g, 208, 350, 150, S.speed / 180, "BMW'S OWN DIAL", String(Math.round(S.speed)), 'MPH');
+  dial(g, 1712, 350, 150, S.rpm / 7200, "BMW'S OWN DIAL", gearText(), Math.round(S.rpm / 10) * 10 + ' RPM');
+  if (S.valet) {   /* valet: the map slot is a locked plate; BMW's own dials either side still show speed and revs */
+    R(g, mx, my, mw, mh, '#050507'); brackets(g, mx, my, mw, mh, 36, A(), 3);
+    drawLogo(g, mx + mw / 2 - 240, my + mh / 2, 110);
+    R(g, mx + mw / 2 - 60, my + 160, 150, 44, A()); T(g, 'VALET', mx + mw / 2 + 15, my + 192, 24, C.bg, { w: 700, a: 'center', ls: 4 });
+    T(g, 'Screens are locked', mx + mw / 2 - 60, my + 256, 30, C.text, { w: 600, ls: 1 });
+    T(g, 'LIMITS 50 MPH // 4000 RPM (SAMPLE)', mx + mw / 2 - 60, my + 296, 16, S.vlog.over ? A() : C.dim, { mono: true, w: 500 });
+    return;
+  }
+  g.save(); g.beginPath(); g.rect(mx, my, mw, mh); g.clip();
+  R(g, mx, my, mw, mh, '#08080b');
+  var off = S.dist % 96;
+  for (var y = -96; y < mh + 96; y += 96) L(g, mx, my + y + off, mx + mw, my + y + off, '#17171d', 2);
+  for (var x = 64; x < mw; x += 128) L(g, mx + x, my, mx + x, my + mh, '#17171d', 2);
+  g.strokeStyle = '#2c2c34'; g.lineWidth = 34; g.beginPath(); g.moveTo(mx + mw / 2, my + mh); g.lineTo(mx + mw / 2, my + 200); g.lineTo(mx + mw / 2 + 240, my - 20); g.stroke();
+  g.strokeStyle = C.text; g.lineWidth = 8; g.beginPath(); g.moveTo(mx + mw / 2, my + mh); g.lineTo(mx + mw / 2, my + 200); g.lineTo(mx + mw / 2 + 240, my - 20); g.stroke();
+  g.fillStyle = A(); g.beginPath(); g.moveTo(mx + mw / 2, my + 330); g.lineTo(mx + mw / 2 + 22, my + 384); g.lineTo(mx + mw / 2, my + 370); g.lineTo(mx + mw / 2 - 22, my + 384); g.closePath(); g.fill();
+  T(g, 'SAMPLE MAP // WAZE FROM CARPLAY GOES HERE', mx + 24, my + mh - 22, 15, C.dim, { mono: true, w: 400 });
+  g.restore();
+  var rc = S.shift && !(S.whole && !unlocked()) ? rpmColour() : null;
+  g.strokeStyle = rc || C.line; g.lineWidth = rc ? 8 : 2; g.strokeRect(mx + 4, my + 4, mw - 8, mh - 8);
+  if (S.detail) { brackets(g, mx - 10, my - 10, mw + 20, mh + 20, 36, rc || A(), 3); T(g, 'MAP SLOT', mx, my - 24, 15, C.dim, { mono: true, w: 400, ls: 3 }); T(g, S.shift ? 'SHIFT LIGHTS ON' : 'SHIFT LIGHTS OFF', mx + mw, my - 24, 15, C.dim, { mono: true, w: 400, ls: 3, a: 'right' }); }
+  if (S.shift) {
+    var n = 16, on = Math.max(0, Math.round((S.rpm - 3000) / 3900 * n)), flash = S.rpm >= 6800 && Math.floor(S.now * 10) % 2 === 0;
+    var sw = (mw - 6 * (n - 1)) / n;
+    for (var i = 0; i < n; i++) skew(g, mx + i * (sw + 6), my + mh + 24, sw, 16, 6, flash ? '#000000' : i < on ? (i < 6 ? C.text : i < 11 ? C.amber : A()) : C.soft, true, true);
+  }
+  if (S.launch.stage !== 'idle') tronGrid(g, mx + 8, my + 8, mw - 16, mh - 16, S.launch.stage === 'go' ? 1 + S.speed / 12 : 0.6, true);
+  if (guardOn()) { cut(g, mx + 28, my + 28, 540, 88, 20, C.deep, A(), 3, false); T(g, 'GARAGE DOOR OPEN', mx + 52, my + 68, 28, C.text, { w: 700, ls: 3 }); T(g, 'MENU BUTTON TWICE TO CLOSE', mx + 52, my + 98, 15, A(), { mono: true, w: 500 }); }
+  if (S.bell > S.now && unlocked()) {
+    var bw = 500, bh = 372, bx = mx + mw - bw - 28, by = my + mh - bh - 28;
+    cut(g, bx, by, bw, bh, 24, C.panel, A(), 3, false);
+    T(g, 'DOORBELL', bx + 20, by + 44, 24, C.text, { w: 700, ls: 3 }); T(g, 'FRONT DOOR', bx + bw - 40, by + 42, 16, C.mid, { mono: true, w: 400, a: 'right' });
+    drawCamera(g, bx + 20, by + 62, bw - 40, 268);
+    segs(g, bx + 20, by + 344, bw - 40, 8, 20, Math.ceil((S.bell - S.now) / 12 * 20), A(), C.soft);
+  }
+}
+
+/* ---------- head-up display ---------- */
+/* the map's box as waze-on-cluster places it: width = a share of the 800 px scene, the 1088 x 480 picture's shape, centred */
+function hudBox() { var w = Math.round(800 * S.hudMap / 100), h = Math.round(w * 480 / 1088); return { x: Math.round((800 - w) / 2), y: Math.round((480 - h) / 2), w: w, h: h }; }
+function drawHudMap(g, rc) {
+  var b = hudBox(), k = b.w / 1088 * 1.6, cx = b.x + b.w / 2, a = A();
+  g.save(); g.beginPath(); g.rect(b.x, b.y, b.w, b.h); g.clip();
+  R(g, b.x, b.y, b.w, b.h, '#0b0b0f');
+  var step = 96 * k, off = (S.dist * k) % step;
+  for (var y = -step; y < b.h + step; y += step) L(g, b.x, b.y + y + off, b.x + b.w, b.y + y + off, '#24242c', 1);
+  for (var x = step / 2; x < b.w; x += step * 1.3) L(g, b.x + x, b.y, b.x + x, b.y + b.h, '#24242c', 1);
+  g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(3, 8 * k); g.beginPath(); g.moveTo(cx, b.y + b.h); g.lineTo(cx, b.y + b.h * 0.42); g.lineTo(cx + b.w * 0.22, b.y - 4); g.stroke();
+  var cy = b.y + b.h * 0.72, s = Math.max(8, 20 * k);
+  g.fillStyle = a; g.beginPath(); g.moveTo(cx, cy - s); g.lineTo(cx + s * 0.8, cy + s); g.lineTo(cx, cy + s * 0.5); g.lineTo(cx - s * 0.8, cy + s); g.closePath(); g.fill();
+  g.restore();
+  g.strokeStyle = rc || a; g.lineWidth = rc ? 6 : 2; g.strokeRect(b.x - 3, b.y - 3, b.w + 6, b.h + 6);
+  if (S.guides) T(g, 'SAMPLE MAP ' + b.w + ' x ' + b.h, b.x + 6, b.y + 16, 11, C.dim, { mono: true, w: 400, ls: 0 });
+}
+/* the same shift lights as under the cluster's map: white, amber, red, then flashing */
+function shiftBar(g, x, y, w, h) {
+  var n = 16, on = Math.max(0, Math.round((S.rpm - 3000) / 3900 * n)), flash = S.rpm >= 6800 && Math.floor(S.now * 10) % 2 === 0, sw = (w - 4 * (n - 1)) / n;
+  for (var i = 0; i < n; i++) skew(g, x + i * (sw + 4), y, sw, h, 5, flash ? '#000000' : i < on ? (i < 6 ? '#ffffff' : i < 11 ? C.amber : A()) : '#2a2a31', true, true);
+}
+function gearText() { return S.mode + S.gear; }
+function drawHud() {
+  var g = hud.g, a = A();
+  hud.targets = []; hud.over = false;
+  R(g, 0, 0, 800, 480, '#000000');
+  hit(hud, 0, 0, 800, 480, menuBtn);
+  if (S.valet) {   /* valet: nothing of ours but the speed and a tag; the wheel menu is dead */
+    if (S.guides) { dashed(g, 120, 100, 570, 278, ''); T(g, 'VALET: ONLY THE SPEED SHOWS', 14, 24, 13, C.dim, { mono: true, w: 400 }); }
+    T(g, String(Math.round(S.speed)), 140, 366, 46, '#e6e6ea', { w: 600 }); T(g, 'MPH', 140 + g.measureText(String(Math.round(S.speed))).width + 56, 366, 16, '#b9bac2', { mono: true, w: 400 });
+    R(g, 604, 348, 76, 24, a); T(g, 'VALET', 642, 366, 14, '#000000', { w: 700, a: 'center', ls: 2 });
+    hud.cv.style.cursor = '';
+    return;
+  }
+  if (S.guides) { T(g, 'BLACK IS SEE-THROUGH ON THE GLASS', 14, 24, 13, C.dim, { mono: true, w: 400 }); dashed(g, 120, 100, 570, 278, ''); T(g, 'VISIBLE WINDOW', 120, 92, 12, C.dim, { mono: true, w: 400 }); }
+  var sx = 220, sy = 208, sw = S.menu.open ? 280 : 470, sh = 106, rc = S.shift ? rpmColour() : null, mb = S.hudMap ? hudBox() : null;
+  if (mb) drawHudMap(g, null);
+  /* everything below is drawn over the map. A black plate is a see-through hole in the map on the glass. */
+  var plate = function (x, y, w, h) { if (mb && x < mb.x + mb.w && x + w > mb.x && y < mb.y + mb.h && y + h > mb.y) R(g, x, y, w, h, '#000000'); };
+  dashed(g, 120, 105, 570, 77, '');
+  plate(128, 120, 64, 24);
+  /* the rev bar in colour: each segment is white, amber or red by where it sits against the shift point; all red and blinking at it */
+  var bsa = shiftAt(), bblink = S.shift && S.rpm >= bsa;
+  segs(g, 132, 150, 546, 14, 30, Math.round(S.rpm / 7200 * 30), function (i) {
+    var r = (i + 1) / 30 * 7200;
+    if (!S.shift) return '#e6e6ea';
+    if (bblink) return Math.floor(S.now * 10) % 2 ? a : '#2a2a31';
+    return r >= bsa - 500 ? a : r >= bsa - 1300 ? C.amber : '#e6e6ea';
+  }, '#2a2a31', 3);
+  T(g, Math.round(S.rpm / 100) / 10 + '', 132, 138, 20, '#b9bac2', { w: 600 });
+  /* now playing: the very top line of the visible window, above the rev band */
+  if (S.song) {
+    var nx = S.valet ? 216 : 132;
+    plate(128, 100, 554, 22);
+    g.fillStyle = a; g.beginPath(); g.moveTo(nx, 103); g.lineTo(nx + 11, 109.5); g.lineTo(nx, 116); g.closePath(); g.fill();
+    T(g, 'SAMPLE SONG TITLE', nx + 18, 115, 15, '#ffffff', { w: 700, ls: 1 });
+    T(g, 'SAMPLE ARTIST', 678, 115, 12, '#b9bac2', { mono: true, w: 400, a: 'right', ls: 1 });
+    R(g, 132, 119, 546, 2, '#33333a'); R(g, 132, 119, 546 * ((S.now % 200) / 200), 2, a);
+  }
+  dashed(g, 120, 318, 220, 60, '');
+  plate(124, 322, 212, 54);
+  T(g, String(Math.round(S.speed)), 140, 366, 46, '#e6e6ea', { w: 600 }); T(g, 'MPH', 140 + g.measureText(String(Math.round(S.speed))).width + 56, 366, 16, '#b9bac2', { mono: true, w: 400 });
+  /* the gear is the shift light: its digits fill from the bottom as revs climb (white, amber, red), then blink red */
+  plate(540, 312, 148, 66);
+  var sa = shiftAt(), gf = Math.max(0, Math.min(1, (S.rpm - (sa - 3800)) / 3800)), gcol = S.rpm >= sa - 500 ? a : S.rpm >= sa - 1300 ? C.amber : '#ffffff', gopt = { w: 700, a: 'center', ls: 0 };
+  T(g, 'GEAR', 584, 368, 13, '#b9bac2', { mono: true, w: 400, a: 'right' });
+  if (!S.shift) T(g, gearText(), 640, 370, 58, '#ffffff', gopt);
+  else if (S.rpm >= sa) { if (Math.floor(S.now * 10) % 2) T(g, gearText(), 640, 370, 58, a, gopt); }
+  if (S.coach && S.shift) T(g, 'AT ' + sa, 584, 350, 12, '#b9bac2', { mono: true, w: 400, a: 'right', ls: 0 });
+  else {
+    T(g, gearText(), 640, 370, 58, '#74767f', gopt);
+    if (gf > 0) { g.save(); g.beginPath(); g.rect(590, 371 - 43 * gf, 100, 43 * gf + 2); g.clip(); T(g, gearText(), 640, 370, 58, gcol, gopt); g.restore(); }
+  }
+  var warm = S.oil >= 100, ready = warm && S.readyAt && S.now - S.readyAt < 5;
+  if (S.warmShow && (!warm || ready)) {
+    if (mb) {
+      plate(346, 326, 196, 50);
+      T(g, ready ? 'OIL READY' : 'OIL ' + Math.round(S.oil) + '°', 352, 348, 17, ready ? '#ffffff' : a, { w: 700, ls: 1 });
+      T(g, ready ? '' : '<' + safeLimit(), 536, 348, 15, S.rpm > safeLimit() ? a : '#ffffff', { mono: true, w: 500, a: 'right', ls: 0 });
+      segs(g, 352, 358, 184, 10, 12, Math.round((S.oil - 20) / 80 * 12), ready ? '#ffffff' : a, '#33333a', 3);
+    } else {
+      brackets(g, sx, sy, sw, sh, 16, a, 3);
+      T(g, ready ? 'OIL READY' : 'OIL WARMING', sx + 14, sy + 30, 22, '#ffffff', { w: 700, ls: 3 });
+      T(g, Math.round(S.oil) + '°', sx + sw - 14, sy + 30, 22, a, { mono: true, w: 700, a: 'right', ls: 0 });
+      segs(g, sx + 14, sy + 42, sw - 28, 14, 12, Math.round((S.oil - 20) / 80 * 12), ready ? '#ffffff' : a, '#33333a', 4);
+      T(g, ready ? 'FULL REVS OK' : 'KEEP UNDER ' + safeLimit(), sx + 14, sy + 90, 17, S.rpm > safeLimit() ? a : '#ffffff', { mono: true, w: 500 });
+      if (!S.menu.open) T(g, 'BOX ' + Math.round(S.box) + '°', sx + sw - 14, sy + 90, 17, '#ffffff', { mono: true, w: 500, a: 'right' });
+    }
+  }
+  if (S.menu.open) {
+    var x = 514, w = 176;
+    cut(g, x, 185, w, 133, 14, '#000000', a, 3, false);
+    T(g, 'MENU', x + 12, 207, 13, C.mid, { mono: true, w: 400, ls: 3 });
+    MENU.forEach(function (m, i) {
+      var y = 217 + i * 24, on = i === S.menu.ix, val = i === 0 ? (S.warmShow ? 'ON' : 'OFF') : i === 1 ? (S.shift ? 'ON' : 'OFF') : i === 2 ? MAPNAME[S.hudMap] : '';
+      if (on) R(g, x + 8, y, w - 16, 22, a);
+      T(g, m, x + 14, y + 17, 16, on ? '#000000' : '#d8d9de', { w: on ? 700 : 600 }); T(g, val, x + w - 14, y + 17, 13, on ? '#000000' : C.dim, { mono: true, w: 500, a: 'right', ls: 0 });
+    });
+  }
+  var la = S.launch;
+  if (la.stage !== 'idle') {
+    R(g, 216, 196, 478, 112, '#000000'); brackets(g, 220, 200, 470, 104, 16, a, 3);
+    if (la.stage === 'tree') { var lit = treeLit(); for (var li = 0; li < 3; li++) R(g, 300 + li * 110, 222, 80, 60, li < lit ? a : '#33333a'); }
+    else {
+      var hm = la.m, run = la.stage === 'go';
+      T(g, hm.t60 ? '0-60  ' + hm.t60.toFixed(2) : 'RUN', 236, 232, 16, run ? a : '#ffffff', { mono: true, w: 700 });
+      if (hm.e4) T(g, '1/4  ' + hm.e4.toFixed(2) + ' @ ' + Math.round(hm.v4), 674, 232, 16, '#ffffff', { mono: true, w: 700, a: 'right' });
+      T(g, run ? (S.now - la.go).toFixed(2) : (hm.e4 ? hm.e4.toFixed(2) + ' s' : hm.t60 ? hm.t60.toFixed(2) + ' s' : '--'), 455, 290, 64, run ? '#ffffff' : a, { w: 700, a: 'center', ls: 0 });
+    }
+  } else if (guardOn()) {
+    R(g, 216, 196, 478, 112, '#000000'); cut(g, 220, 200, 470, 104, 16, Math.floor(S.now * 3) % 2 ? '#3a0810' : '#000000', a, 4, false);
+    T(g, 'GARAGE OPEN', 455, 248, 34, '#ffffff', { w: 700, a: 'center', ls: 4 });
+    T(g, S.now < S.guard.arm ? 'PRESS AGAIN TO CLOSE' : 'MENU BUTTON TWICE TO CLOSE', 455, 284, 16, a, { mono: true, w: 700, a: 'center' });
+  }
+  if (S.valet) { R(g, 120, 100, 86, 26, a); T(g, 'VALET', 163, 119, 15, '#000000', { w: 700, a: 'center', ls: 2 }); }
+  hud.cv.style.cursor = 'pointer';
+}
+
+/* ---------- panel ---------- */
+function $(id) { return document.getElementById(id); }
+function pressed(id, v) { $(id).setAttribute('aria-pressed', v ? 'true' : 'false'); }
+function syncPanel() {
+  pressed('b-demo', S.demo); pressed('b-phone', S.phone); pressed('b-whole', S.whole); pressed('b-guides', S.guides); pressed('b-detail', S.detail); pressed('b-amb', S.amb.on); pressed('b-song', S.song); pressed('b-valet', S.valet); pressed('b-coach', S.coach);
+  $('s-rpm').disabled = S.demo; $('s-oil').disabled = S.demo;
+  document.documentElement.style.setProperty('--accent', S.accent);
+  Array.prototype.forEach.call(document.querySelectorAll('.sw'), function (b) { pressed(b.id, b.dataset.c === S.accent); });
+}
+function syncLive() {
+  if (S.demo) { $('s-rpm').value = Math.round(S.rpm); $('s-oil').value = Math.round(S.oil); }
+  $('o-rpm').textContent = Math.round(S.rpm / 10) * 10; $('o-oil').textContent = Math.round(S.oil);
+  $('b-scan').disabled = !S.hard;
+  var ab = $('cabin-bar').style, sh = S.amb.shown;
+  ab.setProperty('--amb', ['#f4f4f4', '#ff8a1a', '#e1001a', '#ff1f2e'][sh]); ab.setProperty('--ambo', sh === 3 ? '1' : sh ? '0.7' : '0.45');
+  $('cabin-t').textContent = (S.amb.on ? ['Your colour', 'Amber from 5500', 'Red from 6300', 'Red, full brightness from 6800'][sh] : 'Not following revs') + (S.amb.stage !== sh ? ' (waiting, one change per 1.5 s)' : '');
+  if (guardOn()) { ab.setProperty('--amb', '#e1001a'); ab.setProperty('--ambo', '0.9'); $('cabin-t').textContent = 'Red: a garage door is open'; }
+  $('b-map').textContent = 'HUD map: ' + ({ 0: 'off', 35: 'small', 50: 'medium', 68: 'large' })[S.hudMap];
+  $('state').textContent = unlocked() ? 'Unlocked: an approved phone is in the car.' : S.hard ? 'Hard lock: scan the code to unlock.' : 'Soft lock: no approved phone. Connect one to unlock.';
+}
+ACCENTS.forEach(function (c, i) {
+  var b = document.createElement('button'); b.className = 'sw'; b.id = 'sw-' + i; b.dataset.c = c; b.style.background = c; b.setAttribute('aria-label', 'Accent red ' + (i + 1));
+  b.addEventListener('click', function () { S.accent = c; syncPanel(); }); $('swatches').appendChild(b);
+});
+$('b-demo').onclick = function () { S.demo = !S.demo; if (S.demo && S.phase === 'manual') { S.phase = 'idle'; S.gear = 1; S.hold = 1; } syncPanel(); };
+$('b-reset').onclick = function () { S = fresh(); syncPanel(); };
+$('b-phone').onclick = function () { S.phone = !S.phone; if (!S.phone) S.bell = 0; syncPanel(); };
+$('b-lock').onclick = hardLock; $('b-scan').onclick = scan; $('b-bell').onclick = ring;
+$('b-whole').onclick = function () { S.whole = !S.whole; syncPanel(); };
+$('b-map').onclick = nextMap;
+$('b-song').onclick = function () { S.song = !S.song; syncPanel(); };
+$('b-amb').onclick = function () { S.amb.on = !S.amb.on; syncPanel(); };
+$('b-launch').onclick = function () { S.app = 'launch'; S.launch.stage = 'tree'; S.launch.t = S.now; };
+$('b-report').onclick = function () { S.app = 'report'; };
+$('b-valet').onclick = function () { S.valet = !S.valet; S.launch.stage = 'idle'; S.menu.open = false; if (S.valet) S.vlog = { v: 0, r: 0, n: 0, over: false, msgAt: -9 }; syncPanel(); };
+$('b-coach').onclick = function () { S.coach = !S.coach; syncPanel(); };
+$('b-mode').onclick = function () { S.mode = S.mode === 'D' ? 'M' : 'D'; this.textContent = 'Gearbox: ' + S.mode; };
+$('b-menu').onclick = menuBtn; $('b-up').onclick = function () { roller(-1); }; $('b-down').onclick = function () { roller(1); };
+$('b-guides').onclick = function () { S.guides = !S.guides; syncPanel(); };
+$('b-detail').onclick = function () { S.detail = !S.detail; syncPanel(); };
+$('b-layout').onclick = function () { var on = $('stage').classList.toggle('stack'); pressed('b-layout', on); };
+$('s-rpm').oninput = function () { if (!S.demo) S.rpm = Number(this.value); };
+$('s-oil').oninput = function () { if (!S.demo) S.oil = Number(this.value); };
+
+/* ---------- showreel: a scripted walk through every mode, for screen recording ---------- */
+var REEL = null;
+function reelSteps() {
+  return [
+    { cap: 'Locked until my phone is in the car', d: 5, go: function () {
+      S = fresh(); S.guides = false; S.demo = true; S.phase = 'idle'; S.hold = 999; S.phone = false; S.whole = true;
+      S.tiles[1].state = 'closed'; S.tiles[1].pos = 0; S.tiles[2].state = 'locked'; S.sel = 0; S.app = 'home';
+    } },
+    { cap: 'Phone connects. Everything unlocks.', d: 3.5, go: function () { S.phone = true; S.whole = false; } },
+    { cap: 'Garage door from the dash', d: 1.4, go: function () { S.sel = 0; press(); } },
+    { cap: 'Two presses, so never by accident', d: 7, go: press },
+    { cap: 'Drive off with it open and the car tells you', d: 6, go: function () { S.hold = 0; } },
+    { cap: 'Close it from the steering wheel', d: 1.4, go: menuBtn },
+    { cap: 'Close it from the steering wheel', d: 7, go: menuBtn },
+    { cap: 'Warm-up, song, map, and a gear that fills as you rev', d: 9, go: function () { S.app = 'vitals'; } },
+    { cap: 'Doorbell camera on the cluster', d: 6, go: function () { S.app = 'home'; ring(); } },
+    { cap: 'Launch mode', max: 45, until: function () { return S.launch.stage === 'result'; }, go: function () { S.bell = 0; S.app = 'launch'; S.launch.stage = 'tree'; S.launch.t = S.now; } },
+    { cap: 'Full timeslip, like a drag strip', d: 6, go: function () {} },
+    { cap: 'Valet mode: every screen locks and limits are logged', d: 10, go: function () { S.launch.stage = 'idle'; S.app = 'home'; S.valet = true; S.vlog = { v: 0, r: 0, n: 0, over: false, msgAt: -9 }; } },
+    { cap: 'A report after every drive', d: 6, go: function () { S.valet = false; S.app = 'report'; } },
+    { cap: 'Lock it. Scan to get back in.', d: 6, go: function () { S.whole = true; hardLock(); } }
+  ];
+}
+function reelShow() { var st = REEL.steps[REEL.i]; st.go(); syncPanel(); $('reel-t').textContent = st.cap; }
+function startReel() { REEL = { steps: reelSteps(), i: 0, el: 0 }; document.body.classList.add('reel'); $('reelcap').hidden = false; reelShow(); window.scrollTo(0, 0); }
+function stopReel() { REEL = null; document.body.classList.remove('reel'); $('reelcap').hidden = true; S.guides = true; S.hold = Math.min(S.hold, 1); syncPanel(); }
+function reelTick(dt) {
+  if (!REEL || REEL.i >= REEL.steps.length) return;
+  var st = REEL.steps[REEL.i];
+  REEL.el += dt;
+  $('reel-p').style.width = Math.min(100, (REEL.i + Math.min(1, REEL.el / (st.d || st.max))) / REEL.steps.length * 100) + '%';
+  if (st.until ? (st.until() || REEL.el >= st.max) : REEL.el >= st.d) { REEL.i++; REEL.el = 0; if (REEL.i < REEL.steps.length) reelShow(); }
+}
+$('b-reel').onclick = startReel;
+$('reelcap').onclick = stopReel;
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && REEL) stopReel(); });
+
+/* ---------- loop ---------- */
+S = fresh(); syncPanel();
+var last = 0, liveAt = 0;
+function frame(ts) {
+  var dt = Math.min(0.1, last ? (ts - last) / 1000 : 0); last = ts;
+  update(dt); reelTick(dt);
+  drawCentre(); drawCluster(); drawHud();
+  if (ts - liveAt > 150) { liveAt = ts; syncLive(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+if (document.fonts && document.fonts.load) { document.fonts.load('700 30px "Chakra Petch"'); document.fonts.load('500 16px "JetBrains Mono"'); }
+</script>
+</body>
+</html>
