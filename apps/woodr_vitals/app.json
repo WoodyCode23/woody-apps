@@ -2,7 +2,7 @@
   "id": "woodr_vitals",
   "title": "M3 Vitals",
   "description": "Oil and coolant warm-up state, drivetrain readout and 12 V battery charge",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "vendor": "custom",
   "loggingId": "OAA5",
   "iconGlyph": "car_vitals",
@@ -18,8 +18,8 @@
     },
     "de.bmw.infrastructure.VehicleInformation": {
       "_optional": "gear and selector position",
-      "statusGearboxDrive": "rs",
-      "DataPowerTrain2": "rs"
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
     }
   },
   "screens": [
