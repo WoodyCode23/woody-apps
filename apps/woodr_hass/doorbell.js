@@ -34,7 +34,7 @@
  *
  *   const db = new Doorbell(ctx, relay, APP_ID);
  *   db.start();
- *   db.ring(label, camera);         // the doorbell fired (a relay event, or the test button)
+ *   db.ring(label, camera, secs);   // the doorbell fired (a relay event, or the test button), or a camera tile was pressed
  *   db.dismiss('button');           // take it down now
  *   db.carState({ speed, stage });  // the safety gate's inputs, from kit/car.js
  *   db.status()                     // { shown, mode, why, frames, target }
@@ -174,8 +174,8 @@ class Doorbell {
     /* ---------------- the episode ---------------- */
 
     /** The doorbell rang. */
-    ring(label, camera) {
-        const secs = clamp(Number(this.settings.get('doorbellSecs')) || 20, 5, MAX_SECS);
+    ring(label, camera, forSecs) {
+        const secs = clamp(Number(forSecs) || Number(this.settings.get('doorbellSecs')) || 20, 5, MAX_SECS);
         this.ringAt = Date.now();
         this.until = this.ringAt + secs * 1000;
         this.label = label || 'Front door';

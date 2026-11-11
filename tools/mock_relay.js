@@ -28,6 +28,7 @@ const st = {
         { id: 'big_garage', name: 'Big Garage', kind: 'cover', state: 'closed', actions: ['open', 'close'] },
         { id: 'small_garage', name: 'Small Garage', kind: 'cover', state: 'closed', actions: ['open', 'close'] },
         { id: 'front_door', name: 'Front Door', kind: 'lock', state: 'locked', actions: ['lock'] },
+        { id: 'printer', name: '3D Printer', kind: 'camera', state: 'idle', actions: [], camera: 'front_door' },
     ],
 };
 let waiters = [];

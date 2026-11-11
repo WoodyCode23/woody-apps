@@ -50,6 +50,7 @@ function offer(tile) {
         if (tile.state !== 'on' && has('on')) return { action: 'on', label: 'Turn on' };
         return null;
     }
+    if (tile.kind === 'camera') return { action: 'view', label: 'View' };      /* shown by the car itself, nothing sent */
     if (tile.kind === 'scene' && has('activate')) return { action: 'activate', label: 'Activate' };
     if (tile.kind === 'script' && has('run')) return { action: 'run', label: 'Run' };
     return null;
@@ -64,6 +65,7 @@ function stateColour(tile, t) {
 }
 
 function stateText(tile) {
+    if (tile.kind === 'camera') return tile.ok ? 'Camera' : 'Offline';
     const v = String(tile.state == null ? '' : tile.state);
     if (!v) return '--';
     const n = Number(v);
@@ -146,6 +148,13 @@ mgu.run({
             if (!unlocked()) { say('Not connected: nothing sent', 6); return; }
             const o = offer(tile);
             if (!o) { say(tile.name + ' is ' + stateText(tile).toLowerCase() + ': nothing to do', 4); return; }
+            if (o.action === 'view') {      /* a camera tile: the doorbell's overlay, for longer; a second press closes it */
+                const cam = tile.camera || tile.id;
+                if (doorbell.status().shown && doorbell.camera === cam) { doorbell.dismiss('closed from the tile'); say(tile.name + ': closed', 3); return; }
+                doorbell.ring(tile.name, cam, 60);
+                say(doorbell.status().shown ? tile.name + ': showing for a minute, press again to close' : tile.name + ': the picture only shows while parked', 5);
+                return;
+            }
             if (TWICE.indexOf(tile.kind) >= 0) {
                 const now = Date.now();
                 if (!armed || armed.id !== tile.id || armed.action !== o.action || now > armed.until) {
