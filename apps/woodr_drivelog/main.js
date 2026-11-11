@@ -52,9 +52,15 @@ async function background(bg) {
 
     /* count raw samples as they arrive (the rate an app really gets), next to the kit's scaled values */
     const car = new Car(bg, ['rpm', 'speed', 'accel', 'temps', 'gear', 'condition'], {
-        'de.bmw.infotainment.vehicle.Vehicle2': { statusCarSpeed2: (v) => { st.speedN++; st.lastSpeedAt = Date.now(); const raw = v && v.speedVehicleCentreOfGravity; if (num(raw)) fastLine('speed', (raw * 0.015625).toFixed(3)); } },
-        'de.bmw.infotainment.vehicle.CDS': { statusEngineSpeed2: (v) => { st.rpmN++; const raw = v && v.actualValueRPMEngineCrankshaft; if (num(raw)) fastLine('rpm', (raw * 0.25).toFixed(0)); } },
     });
+    /* Own watches for the raw samples: handlers given to Car as "extra" for these two fields REPLACE its own
+     * (the first drive's log had empty speed and rpm columns), so speed and rpm are read here and kept in st. */
+    bg.signals.watch('de.bmw.infotainment.vehicle.Vehicle2', '1', {
+        statusCarSpeed2: (v) => { st.speedN++; const raw = v && v.speedVehicleCentreOfGravity; if (num(raw) && raw !== 65535) { st.speed = raw * 0.015625; st.speedAt = Date.now(); fastLine('speed', st.speed.toFixed(3)); } },
+    }, log).then((s) => { if (s && s.error) log.warn('speed: ' + s.error); });
+    bg.signals.watch('de.bmw.infotainment.vehicle.CDS', '1', {
+        statusEngineSpeed2: (v) => { st.rpmN++; const raw = v && v.actualValueRPMEngineCrankshaft; if (num(raw) && raw !== 65535) { st.rpm = raw * 0.25; st.rpmAt = Date.now(); fastLine('rpm', st.rpm.toFixed(0)); } },
+    }, log).then((s) => { if (s && s.error) log.warn('rpm: ' + s.error); });
     bg.signals.watch(PEDAL, '1', {
         AngleAcceleratorPedal: (v) => { const raw = v && v.actualValueAngleAcceleratorPedal; if (num(raw)) st.pedal = raw * 0.025; },
     }, log).then((s) => { if (s && s.error) log.warn('pedal: ' + s.error); });
@@ -64,7 +70,11 @@ async function background(bg) {
     let lastCondition;
     const timer = setInterval(() => {
         try {
-            const d = (car.data ? car.data() : car.live) || {};
+            const d = Object.assign({}, (car.data ? car.data() : car.live) || {});
+            const fresh = Date.now() - 3000;
+            if (num(st.speed) && st.speedAt > fresh) d.speed = st.speed;
+            if (num(st.rpm) && st.rpmAt > fresh) d.rpm = st.rpm;
+            st.now = d;
             st.speedHz = st.speedN; st.rpmHz = st.rpmN; st.speedN = 0; st.rpmN = 0;
             hard = (num(st.pedal) && st.pedal > 60) || (num(d.gLong) && Math.abs(d.gLong) > 0.25);
             if (d.condition !== lastCondition) { log.info('vehicle condition ' + lastCondition + ' -> ' + d.condition + ' (rpm ' + f1(d.rpm, 0) + ', speed ' + f1(d.speed) + ')'); lastCondition = d.condition; st.conditions[String(d.condition)] = (st.conditions[String(d.condition)] || 0) + 1; }
@@ -91,7 +101,7 @@ mgu.run({
         async function render() {
             const t = ctx.theme(), st = bgm.st;
             const cv = ctx.canvas(W, H).clear(t.bg);
-            const d = (bgm.car.data ? bgm.car.data() : bgm.car.live) || {};
+            const d = st.now || {};
             G.panel(cv, t, 24, 44, 1552, 468, 'Drive Log');
             const kv = (k, v, y, c) => { cv.text(k, 56, y, 22, t.dim); cv.text(v, 420, y, 22, c || t.text, { font: 'bold' }); };
             kv('Logging to', st.file, 112);
