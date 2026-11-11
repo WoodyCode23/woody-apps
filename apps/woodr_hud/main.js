@@ -82,7 +82,10 @@ async function background(bg) {
         if (!cr) return;
         const list = items();
         if (!menuLayer) {
-            menuLayer = cr.image({ target: 'hud', klass: 'alert', z: 9, x: MENU.x, y: MENU.y, w: MENU.w, h: MENU.h, iw: MENU.w, ih: MENU.h, fps: 4, sampling: 'bilinear' });
+            /* yield 0: the menu stays on the HUD when BMW's own list pop-up opens with the same button (cluster-render
+             * then leaves the HUD to us and BMW's list shows on the cluster instead; seen on the car 2026-11-11:
+             * without it the layer went "waiting: a stock pop-up shows in its place") */
+            menuLayer = cr.image({ target: 'hud', klass: 'alert', z: 9, yield: 0, x: MENU.x, y: MENU.y, w: MENU.w, h: MENU.h, iw: MENU.w, ih: MENU.h, fps: 4, sampling: 'bilinear' });
             if (!menuLayer) { log.warn('menu layer refused'); return; }
         }
         const cv = new Canvas(MENU.w, MENU.h);
