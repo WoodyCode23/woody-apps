@@ -126,12 +126,126 @@ function drawLogo(cv, t, cx, cy, s) {
     cv.polyline(p, Math.max(6, s * 0.11), t.text);
 }
 
+/**
+ * Everything that must work with or without the screens (app.json "autostart": true): the relay's poll, the
+ * doorbell and camera overlay, garage.json for Ambient Studio and the car's state to the house. The kit runs
+ * this on every start of the app and hands what it returns to start() as ctx.background. Before 0.5.0 all of
+ * it lived in start(), so after a head-unit start or an update nothing rang until the app had been opened once.
+ */
+async function background(bg) {
+    const { settings, log } = bg;
+    const car = new Car(bg, ['speed', 'rpm', 'temps', 'gear', 'condition']);
+    const relay = new Relay(bg.dataDir, log);
+    const doorbell = new Doorbell(bg, relay, APP_ID);
+    const hooks = { say: () => {}, refresh: () => {} };      /* the screens fill these in when there are any */
+    const unlocked = () => relay.state === 'paired' && relay.fresh() && relay.session.unlocked;
+
+    /* ---------------- the garage, for Ambient Studio ---------------- */
+
+    const garage = { state: null, since: 0, told: false };
+    /**
+     * garage.json = { ok, state, since }: state is the worst of the garage doors
+     * (opening / closing / open, else closed), since = when it last changed (0 = not seen
+     * changing). ok:false and a file left to go stale both mean "no information", and
+     * Ambient Studio then shows the car's normal light.
+     */
+    function tellGarage() {
+        let state = null;
+        if (unlocked()) {
+            const doors = relay.tiles.filter((x) => x.kind === 'cover');
+            if (doors.length && doors.every((d) => d.ok)) {
+                const any = (s) => doors.some((d) => d.state === s);
+                state = any('opening') ? 'opening' : any('closing') ? 'closing' : any('open') ? 'open'
+                    : doors.every((d) => d.state === 'closed') ? 'closed' : null;
+            }
+        }
+        if (state === null) {
+            if (garage.told) { shared.write('garage.json', { ok: false }); garage.told = false; }
+            garage.state = null;
+            return;
+        }
+        if (state !== garage.state) { garage.since = garage.state === null ? 0 : Date.now(); garage.state = state; }
+        shared.write('garage.json', { ok: true, state: state, since: garage.since });
+        garage.told = true;
+    }
+
+    /* ---------------- car state to the relay ---------------- */
+
+    const push = { at: 0, key: '', sent: 0, failed: 0, condition: undefined };
+    function pushCar() {
+        const d = car.data ? car.data() : car.live;
+        if (!d || d.demo) return;
+        if (d.condition !== push.condition) { log.info('vehicle condition ' + push.condition + ' -> ' + d.condition); push.condition = d.condition; }
+        if (settings.get('pushCar') === false || relay.state !== 'paired' || !relay.online) return;
+        const num = (v, r) => (typeof v === 'number' && isFinite(v) ? Math.round(v * r) / r : undefined);
+        const body = {
+            speed_kmh: num(d.speed, 10), rpm: num(d.rpm, 1), coolant_c: num(d.coolant, 1), oil_c: num(d.oil, 1),
+            gear: num(d.gear, 1), stage: d.stage || undefined, condition: num(d.condition, 1),
+            moving: typeof d.speed === 'number' ? d.speed > MOVING_KMH : undefined,
+            engine: typeof d.rpm === 'number' ? d.rpm > ENGINE_RPM : undefined,
+        };
+        const every = Math.max(10, Number(settings.get('pushEvery')) || 30) * 1000;
+        const now = Date.now(), key = JSON.stringify(body);
+        if (now - push.at < every) return;
+        if (key === push.key && now - push.at < 300000) return;        /* a parked car says it once */
+        push.at = now; push.key = key;
+        relay.car(body).then((ok) => { if (ok) push.sent++; else push.failed++; });
+    }
+
+    /* ---------------- the relay ---------------- */
+
+    relay.on('change', () => {
+        if (relay.state === 'paired' && relay.online && !relay.session.unlocked
+            && String(relay.session.reason).indexOf('scan-required') === 0) relay.scanCode();
+        tellGarage();
+        hooks.refresh();
+    });
+    relay.on('event', (e) => {
+        if (e.type !== 'doorbell') return;
+        log.info('doorbell event: ' + e.label);
+        hooks.say((e.label || 'Front door') + ': doorbell', 10);
+        doorbell.ring(e.label, e.camera);
+    });
+    doorbell.onChange = () => hooks.refresh();
+
+    /* ---------------- car signals ---------------- */
+
+    car.onSample(() => { doorbell.carState(car.data ? car.data() : car.live); });
+    const second = setInterval(() => {
+        try {
+            pushCar();
+            tellGarage();
+            /* settings are read here, not in an onChange handler: the kit keeps one handler, and it is the screens' */
+            if (settings.get('reload') === true) { settings.set('reload', false); relay.stop(); relay.start(); hooks.say('relay.json read again'); }
+            if (settings.get('testBell') === true) { settings.set('testBell', false); doorbell.ring('Front door (test)', 'front_door'); }
+            if (settings.get('doorbell') === 'off' && doorbell.status().shown) doorbell.dismiss('turned off');
+            if (relay.state === 'paired' && relay.online && relay.session && !relay.session.unlocked
+                && String(relay.session.reason).indexOf('scan-required') === 0) relay.scanCode();
+        } catch (e) { log.warn('tick: ' + e); }
+    }, 1000);
+    if (second.unref) second.unref();
+
+    /* ---------------- start ---------------- */
+
+    doorbell.start();
+    relay.start();
+
+    process.on('exit', () => {
+        clearInterval(second);
+        if (garage.told) shared.write('garage.json', { ok: false });
+        doorbell.stop();
+        relay.stop();
+    });
+
+    return { car: car, relay: relay, doorbell: doorbell, hooks: hooks, unlocked: unlocked };
+}
+
 mgu.run({
+    background,
     async start(ctx) {
         const { ui, settings, log } = ctx;
-        const car = new Car(ctx, ['speed', 'rpm', 'temps', 'gear', 'condition']);
-        const relay = new Relay(ctx.dataDir, log);
-        const doorbell = new Doorbell(ctx, relay, APP_ID);
+        const bgm = ctx.background || await background(ctx);
+        const { relay, doorbell, hooks, unlocked } = bgm;
 
         let sel = 0;
         const busy = {};                  /* tile id -> true while an action is in flight */
@@ -139,7 +253,6 @@ mgu.run({
         let note = '', noteUntil = 0;
 
         const say = (text, secs) => { note = text; noteUntil = Date.now() + (secs || 5) * 1000; refresh(); };
-        const unlocked = () => relay.state === 'paired' && relay.fresh() && relay.session.unlocked;
 
         /* ---------------- actions ---------------- */
 
@@ -179,74 +292,7 @@ mgu.run({
             relay.lock('button').then((ok) => say(ok ? 'Locked. Scan the code to unlock.' : 'Could not reach Home Assistant to lock', 6));
         }
 
-        /* ---------------- the garage, for Ambient Studio ---------------- */
-
-        const garage = { state: null, since: 0, told: false };
-        /**
-         * garage.json = { ok, state, since }: state is the worst of the garage doors
-         * (opening / closing / open, else closed), since = when it last changed (0 = not seen
-         * changing). ok:false and a file left to go stale both mean "no information", and
-         * Ambient Studio then shows the car's normal light.
-         */
-        function tellGarage() {
-            let state = null;
-            if (unlocked()) {
-                const doors = relay.tiles.filter((x) => x.kind === 'cover');
-                if (doors.length && doors.every((d) => d.ok)) {
-                    const any = (s) => doors.some((d) => d.state === s);
-                    state = any('opening') ? 'opening' : any('closing') ? 'closing' : any('open') ? 'open'
-                        : doors.every((d) => d.state === 'closed') ? 'closed' : null;
-                }
-            }
-            if (state === null) {
-                if (garage.told) { shared.write('garage.json', { ok: false }); garage.told = false; }
-                garage.state = null;
-                return;
-            }
-            if (state !== garage.state) { garage.since = garage.state === null ? 0 : Date.now(); garage.state = state; }
-            shared.write('garage.json', { ok: true, state: state, since: garage.since });
-            garage.told = true;
-        }
-
-        /* ---------------- car state to the relay ---------------- */
-
-        const push = { at: 0, key: '', sent: 0, failed: 0, condition: undefined };
-        function pushCar() {
-            const d = car.data ? car.data() : car.live;
-            if (!d || d.demo) return;
-            if (d.condition !== push.condition) { log.info('vehicle condition ' + push.condition + ' -> ' + d.condition); push.condition = d.condition; }
-            if (settings.get('pushCar') === false || relay.state !== 'paired' || !relay.online) return;
-            const num = (v, r) => (typeof v === 'number' && isFinite(v) ? Math.round(v * r) / r : undefined);
-            const body = {
-                speed_kmh: num(d.speed, 10), rpm: num(d.rpm, 1), coolant_c: num(d.coolant, 1), oil_c: num(d.oil, 1),
-                gear: num(d.gear, 1), stage: d.stage || undefined, condition: num(d.condition, 1),
-                moving: typeof d.speed === 'number' ? d.speed > MOVING_KMH : undefined,
-                engine: typeof d.rpm === 'number' ? d.rpm > ENGINE_RPM : undefined,
-            };
-            const every = Math.max(10, Number(settings.get('pushEvery')) || 30) * 1000;
-            const now = Date.now(), key = JSON.stringify(body);
-            if (now - push.at < every) return;
-            if (key === push.key && now - push.at < 300000) return;        /* a parked car says it once */
-            push.at = now; push.key = key;
-            relay.car(body).then((ok) => { if (ok) push.sent++; else push.failed++; });
-        }
-
-        /* ---------------- the relay ---------------- */
-
-        relay.on('change', () => {
-            if (!unlocked()) armed = null;
-            if (relay.state === 'paired' && relay.online && !relay.session.unlocked
-                && String(relay.session.reason).indexOf('scan-required') === 0) relay.scanCode();
-            tellGarage();
-            refresh();
-        });
-        relay.on('event', (e) => {
-            if (e.type !== 'doorbell') return;
-            log.info('doorbell event: ' + e.label);
-            say((e.label || 'Front door') + ': doorbell', 10);
-            doorbell.ring(e.label, e.camera);
-        });
-        doorbell.onChange = () => refresh();
+        relay.on('change', () => { if (!unlocked()) armed = null; });
 
         /* ---------------- drawing ---------------- */
 
@@ -354,46 +400,9 @@ mgu.run({
         });
         ui.onClick('BTN_LOCK', () => { lockNow(); return render(); });
 
-        settings.onChange((key) => {
-            if (key === 'reload' && settings.get('reload') === true) {
-                settings.set('reload', false);
-                relay.stop();
-                relay.start();
-                say('relay.json read again');
-                return;
-            }
-            if (key === 'doorbell' && settings.get('doorbell') === 'off') doorbell.dismiss('turned off');
-            if (key === 'testBell' && settings.get('testBell') === true) {
-                settings.set('testBell', false);
-                doorbell.ring('Front door (test)', 'front_door');
-            }
-            refresh();
-        });
-
-        /* ---------------- car signals ---------------- */
-
-        car.onSample(() => { doorbell.carState(car.data ? car.data() : car.live); });
-        const second = setInterval(() => {
-            try {
-                pushCar();
-                tellGarage();
-                if (relay.state === 'paired' && relay.online && relay.session && !relay.session.unlocked
-                    && String(relay.session.reason).indexOf('scan-required') === 0) relay.scanCode();
-            } catch (e) { log.warn('tick: ' + e); }
-        }, 1000);
-        if (second.unref) second.unref();
-
-        /* ---------------- start ---------------- */
-
-        doorbell.start();
-        relay.start();
-
-        process.on('exit', () => {
-            clearInterval(second);
-            if (garage.told) shared.write('garage.json', { ok: false });
-            doorbell.stop();
-            relay.stop();
-        });
+        settings.onChange(() => refresh());
+        hooks.say = say;
+        hooks.refresh = refresh;
 
         ctx.loop('MAIN', 2, render);
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));
