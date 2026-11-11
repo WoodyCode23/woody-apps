@@ -28,14 +28,16 @@ function leaseServers() {
 /** a net/tls `lookup` option. Falls back to the system resolver off the car (preview, desktop). */
 function lookup(hostname, options, cb) {
     if (typeof options === 'function') { cb = options; options = {}; }
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return process.nextTick(cb, null, hostname, 4);
+    /* newer Node asks for every address ({ all: true }) and expects a list; Node 8 on the car never does */
+    const done = (err, addr) => (err ? cb(err) : options && options.all ? cb(null, [{ address: addr, family: 4 }]) : cb(null, addr, 4));
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return process.nextTick(done, null, hostname);
     const servers = leaseServers();
-    if (!servers) return dns.lookup(hostname, { family: 4 }, cb);
+    if (!servers) return dns.lookup(hostname, { family: 4 }, (err, addr) => done(err, addr));
     const r = new dns.Resolver();
     r.setServers(servers);
     r.resolve4(hostname, (err, addrs) => {
-        if (err || !addrs || !addrs.length) return cb(err || new Error('no address for ' + hostname + ' via the uplink lease'));
-        cb(null, addrs[0], 4);
+        if (err || !addrs || !addrs.length) return done(err || new Error('no address for ' + hostname + ' via the uplink lease'));
+        done(null, addrs[0]);
     });
 }
 

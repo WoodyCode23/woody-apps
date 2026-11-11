@@ -8,8 +8,9 @@
  *               on/off. An even number of taps toggles the assistant back to where it was, so the car's own
  *               function is untouched; single presses are left to the car.
  *   Rev-follow  with the engine running (and, if set, only while Redline is on the HUD): your colour when
- *               cruising, red above the warning rpm, red at full brightness from the shift rpm, your light
- *               back when you lift. The light takes a change every 1.5 s, so these are stages, not a needle.
+ *               cruising, amber from the amber rpm (if on), red from the warning rpm, red at full brightness
+ *               from the shift rpm, your light back when you lift. The defaults (5500 / 6300 / 6800) are the
+ *               same steps the gear on the head-up display goes through. The light takes a change every 1.5 s, so these are stages, not a needle.
  *
  * Runs in the background (autostart). Never leaves a temporary effect behind: rev-follow and flashes are
  * put back field for field from what the car reported, also when the app stops.
@@ -32,13 +33,14 @@ const CYCLES = {
 const BRIGHT = { menu: null, boost: 200, max: 254 };
 const HYST = 300;                    /* rpm under a stage's start before it is left */
 const ENGINE_RPM = 400;
+const AMBER = 4;                     /* the car's preset 4, taken to be its orange: not yet looked at in the car */
 
 async function background(bg) {
     const { log, settings } = bg;
     const light = new Light(bg);
     await light.start();
     const car = new Car(bg, ['rpm', 'speed']);
-    const st = { stage: 0, home: null, cycleAt: -1, revOn: settings.get('revFollow') === true, lastTap: null, redline: false };
+    const st = { stage: 0, home: null, cycleAt: -1, revOn: settings.get('revFollow') === true, lastTap: null, redline: false, garage: 0 };
 
     /* your colour when the app starts is "home": the double-tap cycle starts and ends there */
     const homeTimer = setInterval(() => { if (st.home === null && light.state.own) st.home = light.state.own; }, 1000);
@@ -77,21 +79,45 @@ async function background(bg) {
         const rpm = d && typeof d.rpm === 'number' ? d.rpm : null;
         st.redline = HudClaim.others('woodr_ambient').indexOf('redline') >= 0;
         const want = st.revOn && rpm !== null && rpm > ENGINE_RPM && (settings.get('revRedlineOnly') === false || st.redline);
-        if (!want) { if (st.stage) { st.stage = 0; light.back('rev-follow off'); } return; }
-        const warn = Number(settings.get('warnRpm')) || 5500, shift = Number(settings.get('shiftRpm')) || 6800;
-        let s = st.stage;
-        if (rpm >= shift) s = 2;
-        else if (rpm >= warn) s = s === 2 && rpm >= shift - HYST ? 2 : 1;
-        else if (rpm < warn - HYST) s = 0;
+        if (!want) { if (st.stage) { st.stage = 0; st.garage = 0; light.back('rev-follow off'); } return; }
+        const warn = Number(settings.get('warnRpm')) || 6300, shift = Number(settings.get('shiftRpm')) || 6800;
+        const amber = settings.get('revAmber') === false ? warn : Math.min(warn, Number(settings.get('amberRpm')) || 5500);
+        /* where stages 1 (amber), 2 (red) and 3 (red, full brightness) start; with amber off, 1 starts where 2 does and is never shown */
+        const starts = [0, amber, warn, shift];
+        let s = 0;
+        for (let i = 3; i >= 1; i--) if (rpm >= starts[i]) { s = i; break; }
+        if (s < st.stage && rpm >= starts[st.stage] - HYST) s = st.stage;
         if (s === st.stage) return;
         st.stage = s;
-        if (s === 0) light.back('below ' + warn);
-        else if (s === 1) light.temp(3, null, 'rev-follow: red from ' + warn);
+        if (s === 0) { st.garage = 0; light.back('below ' + amber); }
+        else if (s === 1) light.temp(AMBER, null, 'rev-follow: amber from ' + amber);
+        else if (s === 2) light.temp(3, null, 'rev-follow: red from ' + warn);
         else light.temp(3, 254, 'rev-follow: shift ' + shift);
     }
     const revTimer = setInterval(revTick, 250);
     if (revTimer.unref) revTimer.unref();
     car.onSample(revTick);
+
+    /* The garage doors, from the Home Assistant app's /dev/shm/woody/garage.json: red while a door is open or
+     * moving, green for 10 s after the last one closed, the car's own light whenever there is no fresh news
+     * (file older than 40 s, ok:false, the house locked, that app not running). Rev-follow goes first. */
+    function garageTick() {
+        let want = 0;
+        if (settings.get('garage') !== false) {
+            const g = shared.read('garage.json', 40000);
+            if (g && g.ok === true) {
+                if (g.state === 'closed') want = g.since && Date.now() - g.since < 10000 ? 10 : 0;
+                else if (g.state === 'open' || g.state === 'opening' || g.state === 'closing') want = 3;
+            }
+        }
+        if (st.stage) return;
+        if (want === st.garage) return;
+        st.garage = want;
+        if (want) light.temp(want, null, 'garage ' + (want === 3 ? 'open' : 'closed'));
+        else light.back('garage: nothing to show');
+    }
+    const garageTimer = setInterval(() => { try { garageTick(); } catch (e) { log.warn('garage: ' + e); } }, 1000);
+    if (garageTimer.unref) garageTimer.unref();
 
     settings.onChange((key) => {
         if (key === 'brightness') { if (settings.get('brightness') === 'menu') light.back('brightness to menu'); else applyBrightness(); }
@@ -99,7 +125,7 @@ async function background(bg) {
     });
     setTimeout(applyBrightness, 3000);
 
-    process.on('exit', () => { clearInterval(homeTimer); clearInterval(revTimer); taps.stop(); light.stop(); });
+    process.on('exit', () => { clearInterval(homeTimer); clearInterval(revTimer); clearInterval(garageTimer); taps.stop(); light.stop(); });
     return { light: light, st: st, nextColour: nextColour };
 }
 
@@ -147,9 +173,10 @@ mgu.run({
             let y = 336;
             const line = (k, v, c) => { cv.text(k, 988, y, 19, t.dim); cv.text(v, 1552, y, 19, c || t.text, { align: 'right' }); y += 30; };
             line('Stalk button', settings.get('taps') === false ? 'off' : '4 taps next colour, 6 taps rev-follow');
-            line('Rev-follow', st.revOn ? ['cruising', 'red (warning)', 'red + max (shift)'][st.stage] + (settings.get('revRedlineOnly') === false ? '' : st.redline ? ' · Redline on' : ' · waits for Redline') : 'off');
-            line('Warn / shift', (settings.get('warnRpm') || 5500) + ' / ' + (settings.get('shiftRpm') || 6800) + ' rpm');
+            line('Rev-follow', st.revOn ? ['cruising', 'amber', 'red (warning)', 'red + max (shift)'][st.stage] + (settings.get('revRedlineOnly') === false ? '' : st.redline ? ' · Redline on' : ' · waits for Redline') : 'off');
+            line('Amber / red / shift', (settings.get('revAmber') === false ? 'off' : (settings.get('amberRpm') || 5500)) + ' / ' + (settings.get('warnRpm') || 6300) + ' / ' + (settings.get('shiftRpm') || 6800) + ' rpm');
             if (st.lastTap && Date.now() - st.lastTap.at < 8000) line('Last taps', st.lastTap.n + ' taps', '#2fd27a');
+            if (st.garage) line('Garage', st.garage === 3 ? 'a door is open: red' : 'closed: green', st.garage === 3 ? '#ff3b30' : '#2fd27a');
             line('Writes', String(light.writes) + (light.inEffect ? ' · effect on' : ''));
 
             G.frame(cv, t, ['Ambient Studio'], 0, []);

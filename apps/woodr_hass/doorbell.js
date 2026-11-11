@@ -19,7 +19,7 @@
  *
  * Geometry: `map` is 1088x480 on iDrive 7. The gap between the G80's speed readouts has NOT been
  * measured on this car - GAP below is a placeholder. Measure it with woodr_screenlab (grid on the
- * `map` target, photograph, read the numbers off) and put the result in ha.json.
+ * `map` target, photograph, read the numbers off) and change it here.
  *
  * Safety: a moving picture in the driver's primary field of view is a genuine distraction, and in
  * many places a video visible to the driver while the car is in motion is also not legal. The
@@ -28,16 +28,18 @@
  * 'banner' mode draws a small static text strip instead - no image, no motion. 'always' exists
  * because this is the owner's car and the owner's call, but it is not the default.
  *
- *   const db = new Doorbell(ctx, ha, cfg, APP_ID);
+ * The picture comes from the relay (GET /camera/<name>, a 640 px still), about one a second. The
+ * relay refuses the camera while the session is locked, so a locked car shows no picture.
+ *
+ *   const db = new Doorbell(ctx, relay, APP_ID);
  *   db.start();
- *   db.ring();                      // the doorbell fired (from a state_changed, or the button)
+ *   db.ring(label, camera);         // the doorbell fired (a relay event, or the test button)
  *   db.dismiss('button');           // take it down now
  *   db.carState({ speed, stage });  // the safety gate's inputs, from kit/car.js
  *   db.status()                     // { shown, mode, why, frames, target }
  *   db.stop();
  */
 const { ClusterClaim } = require('./cluster_claim');
-const { Stream, snapshot } = require('./mjpeg');
 const jpeg = require('./jpeg');
 const { Canvas } = require('./kit/canvas');
 
@@ -57,19 +59,19 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const isNum = (x) => typeof x === 'number' && isFinite(x);
 
 class Doorbell {
-    constructor(ctx, ha, cfg, appId) {
+    constructor(ctx, relay, appId) {
         this.ctx = ctx;
         this.log = ctx.log;
         this.settings = ctx.settings;
-        this.ha = ha;
-        this.cfg = cfg;
+        this.relay = relay;
+        this.camera = '';            /* the relay's camera name for this episode */
+        this.fetching = false;
         this.appId = appId;
         this.cr = null;
         this.layer = 0;
         this.kind = '';              /* '' | 'image' | 'banner' */
         this.until = 0;
         this.ringAt = 0;
-        this.stream = null;
         this.frames = 0;
         this.lastPush = 0;
         this.car = { speed: null, stage: undefined, condition: undefined };
@@ -103,8 +105,8 @@ class Doorbell {
         this.cr.on('refused', (op, ref, reason) => this.log.warn('doorbell: refused ' + op + ': ' + reason));
         this.cr.on('budget', (cap, max, why) => this.log.info('doorbell: upload budget ' + cap + '/' + max + ' KB/s (' + why + ')'));
         this.cr.connect();
-        /* The watchdog is the guarantee. It runs off its own timer, not off HA, not off the
-         * render loop and not off the camera stream, so the overlay comes down on time even if
+        /* The watchdog is the guarantee. It runs off its own timer, not off the relay, not off the
+         * render loop and not off the camera requests, so the overlay comes down on time even if
          * every other part of the app has wedged. */
         this.watchdog = setInterval(() => this._tick(), WATCHDOG_MS);
         if (this.watchdog.unref) this.watchdog.unref();
@@ -160,11 +162,12 @@ class Doorbell {
     /* ---------------- the episode ---------------- */
 
     /** The doorbell rang. */
-    ring(label) {
+    ring(label, camera) {
         const secs = clamp(Number(this.settings.get('doorbellSecs')) || 20, 5, MAX_SECS);
         this.ringAt = Date.now();
         this.until = this.ringAt + secs * 1000;
-        this.label = label || (this.cfg.doorbell && this.cfg.doorbell.label) || 'Front door';
+        this.label = label || 'Front door';
+        this.camera = camera || '';
         this.frames = 0;
         const want = this._allowed();
         if (!want) { this.why = 'suppressed: ' + (this._mode() === 'off' ? 'turned off' : 'car is moving'); this._changed(); return; }
@@ -183,7 +186,7 @@ class Doorbell {
             else this._show(want, 'gate changed');
             return;
         }
-        if (this.kind === 'image' && !this.stream) this._poll();
+        if (this.kind === 'image') this._poll();
     }
 
     /* ---------------- layers ---------------- */
@@ -201,7 +204,7 @@ class Doorbell {
         this.layer = this.cr.image({
             target: TARGET, klass: 'alert', z: 100,
             x: box.x, y: box.y, w: box.w, h: box.h, iw: box.w, ih: box.h,
-            fps: kind === 'image' ? clamp(Number(this.settings.get('doorbellFps')) || 3, 1, 8) : 1,
+            fps: kind === 'image' ? 2 : 1,
             sampling: 'bilinear', visible: true, opacity: 1,
             contend: this._contend(), guide_hold: 1,
         });
@@ -211,14 +214,13 @@ class Doorbell {
         this.claim.hold(true, 'doorbell/' + kind);
         this.pixbuf = Buffer.alloc(box.w * box.h * 4);
         this._paintChrome();
-        if (kind === 'image') this._openCamera();
+        if (kind === 'image') this._poll();
         this._changed();
     }
 
     _down(why) {
-        if (!this.layer && !this.stream) { this.why = why; return; }
+        if (!this.layer) { this.why = why; return; }
         this.log.info('doorbell: down (' + why + ') after ' + this.frames + ' frame(s)');
-        this._closeCamera();
         this._dropLayer();
         this.claim.hold(false);
         this.why = why;
@@ -254,36 +256,23 @@ class Doorbell {
 
     /* ---------------- camera ---------------- */
 
-    _camera() { return this.cfg.doorbell && this.cfg.doorbell.camera; }
-
-    _openCamera() {
-        const cam = this._camera();
-        if (!cam) { this._paintChrome('ha.json has no doorbell camera'); return; }
-        if (!jpeg.available()) { this._paintChrome('vendor jpeg_decoder.js to see pixels'); this._poll(); return; }
-        /* The MJPEG stream is one request for the whole episode: far cheaper than a snapshot
-         * request per frame, and HA's camera_proxy_stream already paces it. */
-        const s = new Stream(this.cfg, cam);
-        s.on('frame', (jpg) => this._frame(jpg));
-        s.on('error', (e) => { this.log.warn('doorbell: stream: ' + e.message); this._closeCamera(); this._poll(); });
-        s.on('end', () => { this._closeCamera(); });
-        s.start();
-        this.stream = s;
-    }
-
-    _closeCamera() {
-        if (this.stream) { this.stream.removeAllListeners(); this.stream.stop(); this.stream = null; }
-    }
-
-    /** Snapshot fallback, used when the stream will not open: one still per second. */
+    /** One still from the relay, at most one a second and never two requests at once. */
     _poll() {
-        const cam = this._camera();
-        if (!cam || !this.layer || this.kind !== 'image') return;
+        if (!this.layer || this.kind !== 'image' || this.fetching) return;
+        if (!this.camera) { this._paintChrome('no camera for this doorbell'); return; }
+        if (!jpeg.available()) { this._paintChrome('no JPEG decoder in the app'); return; }
         const now = Date.now();
         if (now - this.lastPush < 1000) return;
         this.lastPush = now;
-        snapshot(this.ha, cam).then((jpg) => this._frame(jpg)).catch((e) => {
-            this.log.warn('doorbell: snapshot: ' + e.message);
-            this._paintChrome('camera unreachable');
+        this.fetching = true;
+        const layer = this.layer;
+        this.relay.camera(this.camera).then((jpg) => {
+            this.fetching = false;
+            if (this.layer === layer) this._frame(jpg);
+        }).catch((e) => {
+            this.fetching = false;
+            this.log.warn('doorbell: camera: ' + e.message);
+            if (this.layer === layer) this._paintChrome(e.message === 'locked' ? 'locked' : 'camera unreachable');
         });
     }
 
@@ -295,7 +284,6 @@ class Doorbell {
         jpeg.fit(img.rgba, img.w, img.h, box.w, box.h, this.pixbuf);
         this.frames++;
         this._push(this.pixbuf);
-        this.lastPush = Date.now();
     }
 
     _changed() { if (this.onChange) { try { this.onChange(); } catch (e) { /* the screen's problem */ } } }
