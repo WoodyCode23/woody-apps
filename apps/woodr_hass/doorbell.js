@@ -72,6 +72,9 @@ class Doorbell {
         this.camera = '';            /* the relay's camera name for this episode */
         this.fetching = false;
         this.box = GAP;              /* where this episode's picture is drawn */
+        this.both = false;           /* doorbellScreen = both: a second copy on the head-up display */
+        this.layer2 = 0;
+        this.pixbuf2 = null;
         this.target = TARGET;
         this.live = null;            /* stop() of the running live stream */
         this.liveLatest = null;      /* the newest frame not yet drawn: newer ones replace it, none queue */
@@ -183,7 +186,9 @@ class Doorbell {
         this.frames = 0;
         const want = this._allowed();
         if (!want) { this.why = 'suppressed: ' + (this._mode() === 'off' ? 'turned off' : 'car is moving'); this._changed(); return; }
-        const hud = this.settings.get('doorbellScreen') === 'hud' && want === 'image';
+        const where = this.settings.get('doorbellScreen');
+        const hud = where === 'hud' && want === 'image';
+        this.both = where === 'both' && want === 'image';
         this.target = hud ? HUD_TARGET : TARGET;
         this.box = want === 'image' ? (hud ? HUD_BOX : GAP) : BANNER;
         this.log.info('doorbell: ring - showing ' + want + ' on ' + this.target + ' for ' + secs + ' s');
@@ -224,12 +229,23 @@ class Doorbell {
             fps: kind === 'image' ? 6 : 1,
             sampling: 'bilinear', visible: true, opacity: 1,
             contend: this._contend(), guide_hold: 1,
+            yield: this.target === HUD_TARGET ? 0 : undefined,      /* on the HUD: stay up when a BMW list opens */
         });
         if (!this.layer) { this.why = 'layer refused'; this.log.warn('doorbell: image layer refused'); this._changed(); return; }
         this.kind = kind;
         this.why = why;
         if (this.target === TARGET) this.claim.hold(true, 'doorbell/' + kind);     /* the claim is about the cluster's map slot */
         this.pixbuf = Buffer.alloc(box.w * box.h * 4);
+        if (kind === 'image' && this.both && this.target !== HUD_TARGET) {
+            /* the same picture on the glass as well; if the HUD refuses it the cluster copy carries on alone */
+            this.layer2 = this.cr.image({
+                target: HUD_TARGET, klass: 'alert', z: 100,
+                x: HUD_BOX.x, y: HUD_BOX.y, w: HUD_BOX.w, h: HUD_BOX.h, iw: HUD_BOX.w, ih: HUD_BOX.h,
+                fps: 3, sampling: 'bilinear', visible: true, opacity: 1, contend: 0, yield: 0,
+            });
+            if (this.layer2) this.pixbuf2 = Buffer.alloc(HUD_BOX.w * HUD_BOX.h * 4);
+            else this.log.warn('doorbell: the head-up display copy was refused');
+        }
         this._paintChrome();
         if (kind === 'image') { this._poll(); this._liveStart(); }
         this._changed();
@@ -246,6 +262,9 @@ class Doorbell {
 
     _dropLayer() {
         this._liveStop();
+        if (this.layer2 && this.cr) { try { this.cr.drop(this.layer2); } catch (e) { this.log.warn('doorbell: drop hud: ' + e); } }
+        this.layer2 = 0;
+        this.pixbuf2 = null;
         if (this.layer && this.cr) { try { this.cr.drop(this.layer); } catch (e) { this.log.warn('doorbell: drop: ' + e); } }
         this.layer = 0;
         this.kind = '';
@@ -342,6 +361,11 @@ class Doorbell {
         jpeg.fit(img.rgba, img.w, img.h, box.w, box.h, this.pixbuf);
         this.frames++;
         this._push(this.pixbuf);
+        /* the HUD copy takes every second frame: two full-rate pictures would use up cluster-render's upload budget */
+        if (this.layer2 && this.pixbuf2 && this.frames % 2 === 1) {
+            jpeg.fit(img.rgba, img.w, img.h, HUD_BOX.w, HUD_BOX.h, this.pixbuf2);
+            if (!this.cr.pixels(this.layer2, null, this.pixbuf2)) this.log.warn('doorbell: hud pixels refused');
+        }
     }
 
     _changed() { if (this.onChange) { try { this.onChange(); } catch (e) { /* the screen's problem */ } } }
