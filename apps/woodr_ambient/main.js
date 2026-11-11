@@ -8,7 +8,7 @@
  *               on/off. An even number of taps toggles the assistant back to where it was, so the car's own
  *               function is untouched; single presses are left to the car.
  *   Rev-follow  with the engine running (and, if set, only while Redline is on the HUD): your colour when
- *               cruising, amber from the amber rpm (if on), red from the warning rpm, red at full brightness
+ *               cruising, half red (red low, white above) from the first rpm (if on), full red from the warning rpm, red at full brightness
  *               from the shift rpm, your light back when you lift. The defaults (5500 / 6300 / 6800) are the
  *               same steps the gear on the head-up display goes through. The light takes a change every 1.5 s, so these are stages, not a needle.
  *
@@ -33,7 +33,7 @@ const CYCLES = {
 const BRIGHT = { menu: null, boost: 200, max: 254 };
 const HYST = 300;                    /* rpm under a stage's start before it is left */
 const ENGINE_RPM = 400;
-const AMBER = 4;                     /* the car's preset 4, taken to be its orange: not yet looked at in the car */
+const AMBER = 4;                     /* the step before red: preset 4 is red low in the cabin with white above (the car has no amber) */
 
 async function background(bg) {
     const { log, settings } = bg;
@@ -90,7 +90,7 @@ async function background(bg) {
         if (s === st.stage) return;
         st.stage = s;
         if (s === 0) { st.garage = 0; light.back('below ' + amber); }
-        else if (s === 1) light.temp(AMBER, null, 'rev-follow: amber from ' + amber);
+        else if (s === 1) light.temp(AMBER, null, 'rev-follow: half red from ' + amber);
         else if (s === 2) light.temp(3, null, 'rev-follow: red from ' + warn);
         else light.temp(3, 254, 'rev-follow: shift ' + shift);
     }
@@ -173,8 +173,8 @@ mgu.run({
             let y = 336;
             const line = (k, v, c) => { cv.text(k, 988, y, 19, t.dim); cv.text(v, 1552, y, 19, c || t.text, { align: 'right' }); y += 30; };
             line('Stalk button', settings.get('taps') === false ? 'off' : '4 taps next colour, 6 taps rev-follow');
-            line('Rev-follow', st.revOn ? ['cruising', 'amber', 'red (warning)', 'red + max (shift)'][st.stage] + (settings.get('revRedlineOnly') === false ? '' : st.redline ? ' · Redline on' : ' · waits for Redline') : 'off');
-            line('Amber / red / shift', (settings.get('revAmber') === false ? 'off' : (settings.get('amberRpm') || 5500)) + ' / ' + (settings.get('warnRpm') || 6300) + ' / ' + (settings.get('shiftRpm') || 6800) + ' rpm');
+            line('Rev-follow', st.revOn ? ['cruising', 'half red', 'red (warning)', 'red + max (shift)'][st.stage] + (settings.get('revRedlineOnly') === false ? '' : st.redline ? ' · Redline on' : ' · waits for Redline') : 'off');
+            line('Half red / red / shift', (settings.get('revAmber') === false ? 'off' : (settings.get('amberRpm') || 5500)) + ' / ' + (settings.get('warnRpm') || 6300) + ' / ' + (settings.get('shiftRpm') || 6800) + ' rpm');
             if (st.lastTap && Date.now() - st.lastTap.at < 8000) line('Last taps', st.lastTap.n + ' taps', '#2fd27a');
             if (st.garage) line('Garage', st.garage === 3 ? 'a door is open: red' : 'closed: green', st.garage === 3 ? '#ff3b30' : '#2fd27a');
             line('Writes', String(light.writes) + (light.inEffect ? ' · effect on' : ''));

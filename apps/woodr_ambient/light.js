@@ -22,10 +22,12 @@ const MIN_GAP_MS = 1500;
 const BRI = 'controlBrightnessValueBrightnessOffsetAmbientePanoramicRoofInteriorLighting';
 const MENU = 'controlMenuAmbientePanoramicRoofInteriorLighting';
 
-const NAMES = { 1: 'White 1', 2: 'White 2', 3: 'Red', 4: 'Colour 4', 5: 'Blue 1', 6: 'Colour 6', 7: 'White 3',
-    8: 'Blue 2', 9: 'Colour 9', 10: 'Green', 11: 'Colour 11', 12: 'Pink' };
-const SWATCH = { 1: '#f4f4f4', 2: '#e8eef8', 3: '#e1001a', 4: '#ff8a1a', 5: '#2a6cff', 6: '#ffd21a', 7: '#fff6e0',
-    8: '#1a4dcc', 9: '#1ad2c8', 10: '#2fd27a', 11: '#9a4dff', 12: '#ff4dc4' };
+/* Seen on the car 2026-11-11: 4, 6, 9 and 11 are two-tone (the colour low in the cabin, white above). There is
+ * no orange or amber preset. A swatch here is a paler tint of the low colour. */
+const NAMES = { 1: 'White 1', 2: 'White 2', 3: 'Red', 4: 'Red / white', 5: 'Blue 1', 6: 'Teal / white', 7: 'White 3',
+    8: 'Blue 2', 9: 'Blue / white', 10: 'Green', 11: 'Green / white', 12: 'Pink' };
+const SWATCH = { 1: '#f4f4f4', 2: '#e8eef8', 3: '#e1001a', 4: '#ff8a94', 5: '#2a6cff', 6: '#7fe0d8', 7: '#fff6e0',
+    8: '#1a4dcc', 9: '#8fb0ff', 10: '#2fd27a', 11: '#90e8b8', 12: '#ff4dc4' };
 
 function blank() {
     return {

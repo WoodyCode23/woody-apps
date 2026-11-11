@@ -2,7 +2,7 @@
   "id": "woodr_ambient",
   "title": "Ambient Studio",
   "description": "Your ambient light, built on the car's own: tap a colour, boost the brightness past the menu, tap the high-beam-assistant button 4 times for the next colour (6 for rev-follow), and rev-follow with Redline (red at the warning rpm, full brightness at the shift point).",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "vendor": "custom",
   "loggingId": "OAAD",
   "iconGlyph": "live_data",
@@ -104,13 +104,13 @@
     },
     {
       "key": "revAmber",
-      "label": "Rev-follow: amber stage before red",
+      "label": "Rev-follow: a half-red step before full red",
       "type": "bool",
       "default": true
     },
     {
       "key": "amberRpm",
-      "label": "Amber from",
+      "label": "Half red from",
       "type": "number",
       "unit": "rpm",
       "default": 5500,
