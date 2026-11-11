@@ -72,6 +72,8 @@ class Doorbell {
         this.camera = '';            /* the relay's camera name for this episode */
         this.fetching = false;
         this.box = GAP;              /* where this episode's picture is drawn */
+        this.caption = '';           /* a line of text along the bottom of the picture */
+        this.strips = {};            /* the caption drawn once per width: { text, d } */
         this.both = false;           /* doorbellScreen = both: a second copy on the head-up display */
         this.layer2 = 0;
         this.pixbuf2 = null;
@@ -182,6 +184,7 @@ class Doorbell {
         this.ringAt = Date.now();
         this.until = this.ringAt + secs * 1000;
         this.label = label || 'Front door';
+        this.caption = '';
         this.camera = camera || '';
         this.frames = 0;
         const want = this._allowed();
@@ -196,6 +199,24 @@ class Doorbell {
     }
 
     dismiss(why) { this._down(why || 'dismissed'); }
+
+    /** Text along the bottom of the picture (a printer's progress, later who is at the door). '' removes it. */
+    setCaption(text) { this.caption = String(text || '').slice(0, 90); }
+
+    /* the caption as pixels, laid over the bottom rows of a fitted frame */
+    _captionOnto(buf, w, h) {
+        if (!this.caption || !buf) return;
+        const sh = 38;
+        let s = this.strips[w];
+        if (!s || s.text !== this.caption) {
+            const cv = new Canvas(w, sh);
+            cv.clear([0, 0, 0, 255]);
+            cv.fillRect(0, 0, w, 2, '#ff1f3d');
+            cv.text(this.caption, 10, 27, w > 450 ? 20 : 17, '#ffffff', { font: 'bold' });
+            s = this.strips[w] = { text: this.caption, d: Buffer.from(cv.d.buffer, cv.d.byteOffset, cv.d.length) };
+        }
+        s.d.copy(buf, (h - sh) * w * 4);
+    }
 
     _tick() {
         if (!this.layer) return;
@@ -359,11 +380,13 @@ class Doorbell {
         if (!img) { this._paintChrome('frame could not be decoded'); return; }
         const box = this.box;
         jpeg.fit(img.rgba, img.w, img.h, box.w, box.h, this.pixbuf);
+        this._captionOnto(this.pixbuf, box.w, box.h);
         this.frames++;
         this._push(this.pixbuf);
         /* the HUD copy takes every second frame: two full-rate pictures would use up cluster-render's upload budget */
         if (this.layer2 && this.pixbuf2 && this.frames % 2 === 1) {
             jpeg.fit(img.rgba, img.w, img.h, HUD_BOX.w, HUD_BOX.h, this.pixbuf2);
+            this._captionOnto(this.pixbuf2, HUD_BOX.w, HUD_BOX.h);
             if (!this.cr.pixels(this.layer2, null, this.pixbuf2)) this.log.warn('doorbell: hud pixels refused');
         }
     }

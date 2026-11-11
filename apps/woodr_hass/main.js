@@ -198,6 +198,8 @@ async function background(bg) {
         if (relay.state === 'paired' && relay.online && !relay.session.unlocked
             && String(relay.session.reason).indexOf('scan-required') === 0) relay.scanCode();
         tellGarage();
+        /* a camera tile's picture is up: keep its caption on the tile's current line */
+        if (doorbell.status().shown) relay.tiles.forEach((x) => { if (x.kind === 'camera' && x.info && doorbell.camera === (x.camera || x.id)) doorbell.setCaption(x.name + ': ' + x.info); });
         hooks.refresh();
     });
     relay.on('event', (e) => {
@@ -265,6 +267,7 @@ mgu.run({
                 const cam = tile.camera || tile.id;
                 if (doorbell.status().shown && doorbell.camera === cam) { doorbell.dismiss('closed from the tile'); say(tile.name + ': closed', 3); return; }
                 doorbell.ring(tile.name, cam, 60);
+                doorbell.setCaption(tile.info ? tile.name + ': ' + tile.info : tile.name);
                 say(doorbell.status().shown ? tile.name + ': showing for a minute, press again to close' : tile.name + ': the picture only shows while parked', 5);
                 return;
             }
@@ -332,7 +335,11 @@ mgu.run({
                 cv.roundRect(x, y, cw, ch, 14, withAlpha(t.text, 0.07));
                 cv.strokeRoundRect(x, y, cw, ch, 14, i === sel ? 3 : 2, i === sel ? t.text : withAlpha(colour, 0.55));
                 cv.text(tile.name, x + 22, y + 44, 28, t.text, { font: 'bold' });
-                cv.text(stateText(tile), x + 22, y + (rows > 1 ? 92 : 124), rows > 1 ? 36 : 56, colour, { font: 'bold' });
+                if (tile.kind === 'camera' && tile.info) {      /* "62% · 1 h 20 min left · layer 95/117": the first part large */
+                    const parts = String(tile.info).split(' \u00b7 ');
+                    cv.text(parts[0], x + 22, y + (rows > 1 ? 92 : 124), rows > 1 ? 36 : 56, colour, { font: 'bold' });
+                    parts.slice(1, 3).forEach((s, k) => cv.text(s, x + 22, y + (rows > 1 ? 122 : 164) + k * 30, 22, t.dim));
+                } else cv.text(stateText(tile), x + 22, y + (rows > 1 ? 92 : 124), rows > 1 ? 36 : 56, colour, { font: 'bold' });
                 const bh = rows > 1 ? 50 : 76, by = y + ch - bh - 18;
                 if (busy[tile.id]) cv.text('Sending...', x + 22, by + bh / 2 + 8, 24, t.dim);
                 else if (o) {
