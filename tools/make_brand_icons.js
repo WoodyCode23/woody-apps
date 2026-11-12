@@ -97,12 +97,19 @@ const GLYPH = {
         c.fillRect(30, 78, 80, 8, W);
         for (let i = 0; i < 5; i++) c.fillRect(30 + i * 17, 90, 9, 9, W);
     },
+    scan(c) {      /* diagnostics: a checklist being looked over, one line flagged */
+        c.polyline([[76, 58], [76, 28], [32, 28], [32, 98], [70, 98]], 6, W);
+        c.line(44, 44, 64, 44, 6, W); c.line(44, 62, 60, 62, 6, R); c.line(44, 80, 56, 80, 6, W);
+        c.arc(88, 76, 10, 16, 0, 360, W);
+        c.line(99, 87, 110, 98, 7, W);
+    },
 };
 
 const APPS = {
     woodr_store: 'mark', woodr_hass: 'house', woodr_ambient: 'light', woodr_ambientlab: 'lab', woodr_dashcam: 'camera',
     woodr_devhud: 'bars', woodr_drivelog: 'log', woodr_hud: 'hud', woodr_inputlab: 'wheel', woodr_screenlab: 'grid',
     woodr_vitals: 'pulse', woodr_warmhud: 'thermo', woodr_live: 'gauge', woodr_launch: 'tree',
+    woodr_diag: 'scan',
 };
 
 const outDir = process.argv[2];
