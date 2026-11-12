@@ -5,3 +5,25 @@ __pycache__/
 *.pyc
 secrets/
 ha.json
+# never publish: credentials, the house link's address, logs and anything that carries location
+.env
+.env.*
+relay.json
+relay-token.json
+*.log
+recon/
+*Metadata.json
+*.ts
+*.mp4
+*.pem
+*.key
+HANDOFF.md
+# closed-source apps live in the private bimmerapps-pro repository; tools/link.sh there links them in for builds
+apps/woodr_dashcam
+apps/woodr_diag
+apps/woodr_link
+apps/woodr_launch
+apps/woodr_valet
+apps/woodr_report
+apps/woodr_guard
+components/
