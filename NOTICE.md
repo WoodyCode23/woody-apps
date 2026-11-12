@@ -5,13 +5,14 @@ Required Notice: Copyright (c) 2026 BimmerApps (https://bimmerapps.com)
 ## Our own work
 
 Everything in this repository that we wrote is licensed under the
-[PolyForm Strict License 1.0.0](LICENSE.md): the apps under `apps/woodr_*`, `tools/`, `docs/`, and the
+[PolyForm Noncommercial License 1.0.0](LICENSE.md): the apps under `apps/woodr_*`, `tools/`, `docs/`, and the
 notes in the top folder. In plain words, which do not replace the licence text:
 
-- You may read it and use it on your own car, for noncommercial purposes.
-- You may not sell it, redistribute it, or make and share changed versions of it.
+- You may read it, use it, change it and share it, including changed versions, for any noncommercial purpose.
+- You may not sell it or use it commercially.
+- Copies you share must keep the "Required Notice" line above and these terms.
 
-This is source-available, not open source. For anything the licence does not allow, ask:
+This is source-available, not open source: the noncommercial condition is what separates the two. For anything the licence does not allow, ask:
 hello@bimmerapps.com.
 
 ## Other people's work, under their own licences
