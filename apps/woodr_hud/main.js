@@ -1,16 +1,17 @@
 'use strict';
 /**
- * Woody HUD - a menu on the head-up display, worked by the left stalk's high-beam-assistant button, and shift
- * lights drawn as a border round the Waze map.
+ * Woody HUD - a menu on the head-up display worked from the steering wheel, a rev bar across the top of the
+ * display, and the song CarPlay is playing as one line above it.
  *
- * MENU   Double-tap the button: the menu opens on the HUD and its highlight walks the items by itself
- *        (STEP_MS each). Double-tap again: the highlighted item happens. No pick within a full round: it closes.
- *        Only even tap counts are used, so the assistant always ends where it was (the car's function is
- *        untouched); other counts are left to other apps (Ambient Studio: 4 / 6).
- * SHIFT  With the engine running: a frame round the Waze map's box on the HUD (from waze-on-cluster's status)
- *        green / yellow / red by rpm, flashing from the shift rpm; without the Waze map, a slim bar in the
- *        clear slot instead. The frame's picture changes only with the stage; the flash only toggles the
- *        layer's visibility, so no pixels go up for it.
+ * MENU   The wheel's menu button opens it and the right roller moves the highlight. The menu button again picks
+ *        the highlighted item (setting "Confirm a menu pick with": the roller's press can do it instead, as
+ *        before 0.3.0). "Close" closes without doing anything, and so does 10 s without a touch. The car opens
+ *        its own list with the same button for a moment whatever an app does; an app cannot switch that off.
+ * REVS   With the engine running: a row of segments that fills with the revs, white, then yellow, then red,
+ *        and blinks from the shift rpm. It is redrawn only when the number of lit segments changes; the blink
+ *        only toggles the layer's visibility, so no pixels go up for it. Setting "Shift display": the older
+ *        coloured frame round the Waze map is still there as a choice.
+ * SONG   The title and artist from CarPlay (song.js), on the top line. No CarPlay, no line.
  *
  * Read-only on the car: signals in, pixels out, two small files in /dev/shm/woody for the other Woody apps.
  */
@@ -20,6 +21,8 @@ const Car = require('./kit/car');
 const { Canvas, withAlpha } = require('./kit/canvas');
 const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
+const { Song } = require('./song');
+const { drawBar, drawSong, PLACES, SEGS, RPM_FULL, WHITE, ACCENT } = require('./strip');
 const shared = require('./shared');
 
 let ClusterRender = null;
@@ -62,15 +65,18 @@ async function background(bg) {
         cr.connect();
     } else log.warn('cluster_render_client missing');
     let menuLayer = 0, frameLayer = 0, frameKey = '', frameVisible = false;
+    let barLayer = 0, barGeom = '', barKey = '', barVisible = false, songLayer = 0, songKey = '';
+    const song = new Song(bg, () => { songKey = ''; });
+    song.start().catch((e) => log.info('song: ' + e));
 
     shared.write('hud.json', { warmup: 'auto' });
 
     /* ---------- the menu ---------- */
     const items = () => [
         { key: 'warmup', label: 'Warm-Up: ' + (st.warmup === 'hide' ? 'show again' : 'hide this drive') },
-        { key: 'shift', label: 'Shift lights: ' + (st.shiftOn ? 'off' : 'on') },
+        { key: 'shift', label: 'Rev bar: ' + (st.shiftOn ? 'off' : 'on') },
         { key: 'waze', label: 'Waze map: ' + SIZES[sizeAt()][0] + '  >  ' + SIZES[(sizeAt() + 1) % SIZES.length][0] },
-        { key: 'test', label: 'Test shift lights' },
+        { key: 'test', label: 'Test the rev bar' },
         { key: 'ambient', label: 'Ambient: next colour' },
         { key: 'close', label: 'Close' },
     ];
@@ -109,11 +115,14 @@ async function background(bg) {
         onMenu: () => {
             if (settings.get('menu') === false) return;
             if (!st.menuOpen) { st.menuOpen = true; st.at = 0; st.touched = Date.now(); showMenu(); log.info('menu: open'); return; }
-            /* the menu button again closes the menu without picking; the roller's press picks */
-            closeMenu(); log.info('menu: closed (button)');
+            /* the menu button again picks the highlighted item (0.3.0); with "Confirm with: roller" it closes instead */
+            if (settings.get('confirm') === 'roller') { closeMenu(); log.info('menu: closed (button)'); return; }
+            const chosen = items()[st.at];
+            closeMenu();
+            if (chosen && chosen.key !== 'close') pick(chosen.key); else log.info('menu: closed (button)');
         },
         onPress: () => {
-            if (!st.menuOpen) return;
+            if (!st.menuOpen || settings.get('confirm') !== 'roller') return;
             const it = items()[st.at];
             closeMenu();
             if (it && it.key !== 'close') pick(it.key);
@@ -160,6 +169,47 @@ async function background(bg) {
     }
     function hideFrame() { if (frameLayer && cr) { cr.drop(frameLayer); frameLayer = 0; frameKey = ''; } }
 
+    /* ---------- rev bar and song line ---------- */
+    const place = () => PLACES[settings.get('place') === 'slot' ? 'slot' : 'top'];
+    function colourAt(rpm) {
+        const y = Number(settings.get('yellowRpm')) || 5500, r = Number(settings.get('redRpm')) || 6300;
+        return rpm >= r ? ACCENT : rpm >= y ? COLOURS.yellow : WHITE;
+    }
+    function hideBar() { if (barLayer && cr) { cr.drop(barLayer); } barLayer = 0; barKey = ''; barGeom = ''; barVisible = false; }
+    function showBar(rpm, blink) {
+        const g = place().bar, geom = JSON.stringify(g);
+        if (geom !== barGeom) { hideBar(); barGeom = geom; }
+        if (!barLayer) {
+            barLayer = cr.image({ target: 'hud', klass: 'overlay', z: 7, x: g.x, y: g.y, w: g.w, h: g.h, iw: g.w, ih: g.h, fps: 8, sampling: 'nearest' });
+            if (!barLayer) { log.warn('rev bar layer refused'); barGeom = ''; return; }
+            barVisible = true;
+        }
+        const filled = Math.max(0, Math.min(SEGS, Math.round(rpm / RPM_FULL * SEGS)));
+        const key = filled + '|' + (settings.get('yellowRpm') || '') + '|' + (settings.get('redRpm') || '');
+        if (key !== barKey) {
+            const cv = new Canvas(g.w, g.h);
+            drawBar(cv, g.w, g.h, filled, colourAt);
+            cr.pixels(barLayer, null, Buffer.from(cv.d.buffer || cv.d));
+            barKey = key;
+        }
+        const want = blink ? !barVisible : true;
+        if (want !== barVisible) { cr.set(barLayer, { visible: want }); barVisible = want; }
+    }
+    function hideSong() { if (songLayer && cr) { cr.drop(songLayer); } songLayer = 0; songKey = ''; }
+    function showSong() {
+        const now = settings.get('song') !== false ? song.now : null;
+        if (!now) { hideSong(); return; }
+        const g = place().song, key = JSON.stringify(g) + now.title + '|' + now.artist;
+        if (key === songKey && songLayer) return;
+        hideSong();
+        songLayer = cr.image({ target: 'hud', klass: 'overlay', z: 6, x: g.x, y: g.y, w: g.w, h: g.h, iw: g.w, ih: g.h, fps: 1, sampling: 'nearest' });
+        if (!songLayer) { log.warn('song layer refused'); return; }
+        const cv = new Canvas(g.w, g.h);
+        drawSong(cv, g.w, g.h, now);
+        cr.pixels(songLayer, null, Buffer.from(cv.d.buffer || cv.d));
+        songKey = key;
+    }
+
     let flashOn = false;
     const shiftTimer = setInterval(() => {
         try {
@@ -172,6 +222,17 @@ async function background(bg) {
                 : st.shiftOn && rpm !== null && rpm > 400 ? stageOf(rpm) : '';
             if (stage !== st.stage) log.info('shift: ' + (stage || 'off') + (rpm !== null ? ' at ' + Math.round(rpm) + ' rpm' : '') + (testLeft > 0 ? ' (test)' : ''));
             st.stage = stage;
+            const running = testLeft > 0 || (rpm !== null && rpm > 400);
+            if (running) showSong(); else hideSong();
+            if (settings.get('style') !== 'frame') {
+                /* the rev bar: shown whenever the engine runs, whatever the stage; the old frame stays away */
+                hideFrame();
+                if (!running || (!st.shiftOn && testLeft <= 0)) { hideBar(); return; }
+                const shown = testLeft > 0 ? [7000, 6500, 5800, 4500, 3000][Math.floor(testLeft / 1500)] || 3000 : rpm;
+                showBar(shown, stage === 'flash');
+                return;
+            }
+            hideBar();
             if (!stage) { hideFrame(); return; }
             placeFrame(st.box, COLOURS[stage === 'flash' ? 'red' : stage]);
             if (stage === 'flash') { flashOn = !flashOn; cr.set(frameLayer, { visible: flashOn }); frameVisible = flashOn; }
@@ -182,8 +243,8 @@ async function background(bg) {
     const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 15000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
-    process.on('exit', () => { [menuTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
-    return { st: st, items: items, waze: waze, pick: pick };
+    process.on('exit', () => { [menuTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); hideBar(); hideSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
+    return { st: st, items: items, waze: waze, pick: pick, song: song };
 }
 
 mgu.run({
@@ -196,7 +257,7 @@ mgu.run({
             const cv = ctx.canvas(W, H).clear(t.bg);
             G.panel(cv, t, 24, 44, 760, 468, 'HUD menu');
             ['Press the menu button on the wheel (three lines, right side):', 'our menu opens on the HUD over BMW\'s list.',
-                'Roll the right roller to move, press the roller to pick, the menu button again to close.', '', 'It closes by itself after 10 s.']
+                'Roll the right roller to move, then ' + (settings.get('confirm') === 'roller' ? 'press the roller to pick.' : 'press the menu button again to pick.'), '', 'Pick Close, or wait 10 s, to leave without picking.']
                 .forEach((l, i) => cv.text(l, 48, 112 + i * 34, 21, i < 3 ? t.text : t.dim));
             bgm.items().forEach((it, i) => {
                 const y = 300 + i * 40;
@@ -204,16 +265,18 @@ mgu.run({
                 cv.text(it.label, 64, y - 4, 20, t.text);
                 if (cv.own) cv.target(48, y - 28, 600, 34, () => { bgm.pick(it.key); return render(); }, 'i' + i, 8);
             });
-            G.panel(cv, t, 804, 44, 772, 468, 'Shift lights');
+            G.panel(cv, t, 804, 44, 772, 468, 'Revs and song');
             const box = bgm.waze.hudBox();
             const line = (k, v, y, c) => { cv.text(k, 828, y, 20, t.dim); cv.text(v, 1552, y, 20, c || t.text, { align: 'right' }); };
-            line('Shift lights', bgm.st.shiftOn ? 'on' : 'off', 112, bgm.st.shiftOn ? '#2fd27a' : t.dim);
-            line('Where', box ? 'round the Waze map (' + box.w + 'x' + box.h + ' at ' + box.x + ',' + box.y + ')' : 'slim bar (Waze map not on the HUD)', 146);
+            line('Revs on the display', bgm.st.shiftOn ? 'on' : 'off', 112, bgm.st.shiftOn ? '#2fd27a' : t.dim);
+            line('Shown as', settings.get('style') === 'frame' ? (box ? 'frame round the Waze map' : 'slim bar (Waze map not on the HUD)') : 'rev bar, ' + (settings.get('place') === 'slot' ? 'in the clear slot' : 'top of the display'), 146);
             line('Green / yellow / red', (settings.get('greenRpm') || 4000) + ' / ' + (settings.get('yellowRpm') || 5500) + ' / ' + (settings.get('redRpm') || 6300) + ' rpm', 180);
             line('Flash from', (settings.get('shiftRpm') || 6800) + ' rpm', 214);
             line('Now', bgm.st.stage || 'idle', 248, bgm.st.stage ? COLOURS[bgm.st.stage === 'flash' ? 'red' : bgm.st.stage] : t.dim);
             line('Warm-Up HUD', bgm.st.warmup, 282);
             line('Last pick', bgm.st.lastPick || '-', 316);
+            const sn = bgm.song.now;
+            line('Song', settings.get('song') === false ? 'off' : sn ? (sn.title + (sn.artist ? ', ' + sn.artist : '')).slice(0, 44) : bgm.song.error ? 'not available' : 'nothing playing', 350);
             G.frame(cv, t, ['Woody HUD'], 0, []);
             await ui.image('MAIN_GFX', cv);
         }

@@ -1,8 +1,8 @@
 {
   "id": "woodr_hud",
   "title": "Woody HUD",
-  "description": "A menu on the head-up display worked from the steering wheel (the menu button opens, the right roller moves and its press picks), and shift lights as a border round the Waze map. Hide or show Warm-Up HUD, resize the Waze map, step the ambient colour.",
-  "version": "0.2.4",
+  "description": "A menu on the head-up display worked from the steering wheel, a rev bar across the top of the display that changes colour and blinks at the shift point, and the song CarPlay is playing as one line above it. Read-only: signals in, pixels out.",
+  "version": "0.3.0",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",
@@ -19,6 +19,10 @@
       "statusSpecialFunctionButton": "rs",
       "statusRotarySteps": "rs",
       "statusRotaryPress": "rs"
+    },
+    "de.bmw.infotainment.entertainment.mediaplayer.MediaPlayer": {
+      "_optional": "the song CarPlay is playing, for the song line",
+      "currentItemMetadata": "s"
     }
   },
   "screens": [
@@ -29,7 +33,7 @@
       "buttons": [
         [
           "BTN_ACTION",
-          "Shift lights on/off"
+          "Rev bar on/off"
         ],
         [
           "BTN_SETTINGS",
@@ -47,9 +51,63 @@
     },
     {
       "key": "shift",
-      "label": "Shift lights",
+      "label": "Show the revs on the head-up display",
       "type": "bool",
       "default": true
+    },
+    {
+      "key": "style",
+      "label": "Shift display",
+      "type": "choice",
+      "options": [
+        [
+          "bar",
+          "Rev bar"
+        ],
+        [
+          "frame",
+          "Frame round the map"
+        ]
+      ],
+      "default": "bar"
+    },
+    {
+      "key": "place",
+      "label": "Rev bar and song position",
+      "type": "choice",
+      "options": [
+        [
+          "top",
+          "Top of the display"
+        ],
+        [
+          "slot",
+          "Lower, clear of the car's own readouts"
+        ]
+      ],
+      "default": "top"
+    },
+    {
+      "key": "song",
+      "label": "Show the song line",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "confirm",
+      "label": "Confirm a menu pick with",
+      "type": "choice",
+      "options": [
+        [
+          "menu",
+          "The menu button again"
+        ],
+        [
+          "roller",
+          "The roller's press"
+        ]
+      ],
+      "default": "menu"
     },
     {
       "key": "greenRpm",
