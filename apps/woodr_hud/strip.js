@@ -1,6 +1,6 @@
 'use strict';
 /**
- * strip.js - the two things Woody HUD draws at the top of the head-up display: the song line and the rev bar.
+ * strip.js - the two things HUD draws at the top of the head-up display: the song line and the rev bar.
  * Kept apart from main.js so tools/render_hud_strip.js can draw the same pictures on a PC.
  */
 const SLOT = { x: 220, y: 185, w: 470, h: 133 };            /* clear of the car's own HUD content in every view (Screen Lab) */

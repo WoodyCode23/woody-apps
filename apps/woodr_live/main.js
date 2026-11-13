@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Woody Live - the drive at a glance, in the red and black "Redline Terminal" look.
+ * Live - the drive at a glance, in the red and black "Redline Terminal" look.
  *
  * One screen made to be watched (or screen shared): speed, gear, a segmented rev bar that fills white,
  * then amber, then red and blinks at the shift point, oil and coolant, g-forces and the 12 V battery.

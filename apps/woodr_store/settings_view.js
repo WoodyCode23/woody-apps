@@ -1,7 +1,7 @@
 'use strict';
 /**
- * settings_view.js - the "Wi-Fi, sources and restart" page of Woody Apps: everything the stock Store's
- * settings do, so Woody Apps can take its place (phase 2: updater.local.conf store_app = woodr_store).
+ * settings_view.js - the "Wi-Fi, sources and restart" page of BimmerApps Hub: everything the stock Store's
+ * settings do, so BimmerApps Hub can take its place (phase 2: updater.local.conf store_app = woodr_store).
  *
  * Rows from the updater's state. Every action is one of the updater's privileged requests (they need the
  * secret it writes into the Store app's data folder); without it the rows still show, and say so.

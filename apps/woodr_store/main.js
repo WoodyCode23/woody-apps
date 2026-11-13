@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Woody Apps - a store for this car, on top of mgu-updater and mgu-deploy.
+ * BimmerApps Hub - a store for this car, on top of mgu-updater and mgu-deploy.
  *
  * The updater and the deploy tool stay as they are: fetching, building on the head unit, installing,
  * snapshots, rollback and boot recovery. This app is only a front end on the updater's socket.
@@ -106,7 +106,7 @@ mgu.run({
         function pressSetting(x) {
             if (!x.act) { note = x.info || ''; noteAt = Date.now(); return; }
             if (demo) { note = 'Preview: nothing changes'; noteAt = Date.now(); return; }
-            if (!client.secret) { note = 'Needs Store powers: phase 2 makes Woody Apps the Store'; noteAt = Date.now(); return; }
+            if (!client.secret) { note = 'Needs Store powers: phase 2 makes BimmerApps Hub the Store'; noteAt = Date.now(); return; }
             if (x.confirm && (setArmed !== x.key || Date.now() - setArmedAt > 5000)) { setArmed = x.key; setArmedAt = Date.now(); note = 'Press again: ' + x.label.trim(); noteAt = Date.now(); return; }
             setArmed = null;
             client._priv(Object.assign({}, x.act));
@@ -222,7 +222,7 @@ mgu.run({
                     if (row.back) {
                         cv.text('<  All developers', 60, ry + 36, 24, t.text, { font: on ? 'bold' : undefined });
                     } else {
-                        cv.text(g.mine ? 'Woody  (my apps)' : g.dev, 60, ry + 26, 24, g.mine ? AMBER : t.text, { font: 'bold' });
+                        cv.text(g.mine ? 'BimmerApps  (my apps)' : g.dev, 60, ry + 26, 24, g.mine ? AMBER : t.text, { font: 'bold' });
                         cv.text(g.items.length + (g.items.length === 1 ? ' app' : ' apps') + '  ·  ' + g.installed + ' installed', 60, ry + 48, 18, t.dim);
                         const tags = [g.queued ? g.queued + ' queued' : '', g.updates ? g.updates + (g.updates > 1 ? ' updates' : ' update') : ''].filter((x) => x);
                         cv.text(tags.length ? tags.join('  ·  ') : 'Open  >', p.x + p.w - 30, ry + 36, 20, tags.length ? AMBER : t.dim, { font: 'bold', align: 'right' });
@@ -258,7 +258,7 @@ mgu.run({
                 const x = row.setting;
                 let sy = p.y + 92;
                 cv.text(x ? x.label.trim() : 'Wi-Fi, sources and restart', p.x + 24, sy, 30, t.text, { font: 'bold' }); sy += 40;
-                const info = x ? x.info : 'Wi-Fi on/off and networks, USB tethering, sources, the phone page and restart. These need Store powers: they work once Woody Apps is the Store (phase 2).';
+                const info = x ? x.info : 'Wi-Fi on/off and networks, USB tethering, sources, the phone page and restart. These need Store powers: they work once BimmerApps Hub is the Store (phase 2).';
                 wrap(cv, info, 20, p.w - 48, 4).forEach((l) => { cv.text(l, p.x + 24, sy, 20, t.dim); sy += 28; });
                 if (!client.secret) { sy += 10; cv.text('Store powers: not yet (phase 2)', p.x + 24, sy, 20, AMBER, { font: 'bold' }); sy += 30; }
                 /* the phone page's address as a QR code, from the file the updater writes for the Store */
@@ -293,7 +293,7 @@ mgu.run({
                 /* a folder: who it is and where its apps come from */
                 const g = row.folder || row.back;
                 let fy = p.y + 92;
-                cv.text(g.mine ? 'Woody (my apps)' : g.dev, p.x + 24, fy, 32, g.mine ? AMBER : t.text, { font: 'bold' }); fy += 40;
+                cv.text(g.mine ? 'BimmerApps (my apps)' : g.dev, p.x + 24, fy, 32, g.mine ? AMBER : t.text, { font: 'bold' }); fy += 40;
                 cv.text(g.items.length + ' apps, ' + g.installed + ' installed' + (g.updates ? ', ' + g.updates + ' to update' : ''), p.x + 24, fy, 20, t.text); fy += 40;
                 cv.text('Sources', p.x + 24, fy, 20, t.dim); fy += 30;
                 g.sources.forEach((src) => {
@@ -381,7 +381,7 @@ mgu.run({
             const cv = ctx.canvas(W, H).clear(t.bg);
             drawList(cv, t);
             drawDetail(cv, t);
-            G.frame(cv, t, ['Woody Apps'], 0, []);
+            G.frame(cv, t, ['BimmerApps Hub'], 0, []);
             drawStatus(cv, t);
             await ui.image('MAIN_GFX', cv);
         }

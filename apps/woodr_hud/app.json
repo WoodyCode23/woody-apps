@@ -1,8 +1,8 @@
 {
   "id": "woodr_hud",
-  "title": "Woody HUD",
+  "title": "HUD",
   "description": "A menu on the head-up display worked from the steering wheel, a rev bar across the top of the display that changes colour and blinks at the shift point, and the song CarPlay is playing as one line above it. Read-only: signals in, pixels out.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",
@@ -29,7 +29,7 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "Woody HUD",
+      "title": "HUD",
       "buttons": [
         [
           "BTN_ACTION",

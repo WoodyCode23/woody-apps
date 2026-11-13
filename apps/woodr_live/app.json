@@ -1,12 +1,14 @@
 {
   "id": "woodr_live",
-  "title": "Woody Live",
+  "title": "Live",
   "description": "The drive at a glance in red and black: speed, gear, a rev bar that goes amber then red, temperatures, g-forces and the 12 V battery. Made to be watched, or screen shared. Read-only.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "vendor": "custom",
   "loggingId": "OAB1",
   "iconGlyph": "live_data",
-  "mguHmi": ["ID7"],
+  "mguHmi": [
+    "ID7"
+  ],
   "signals": {
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineTemperature": "rs",
@@ -31,19 +33,81 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "Woody Live",
+      "title": "Live",
       "buttons": [
-        ["BTN_SETTINGS", "Settings"]
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
       ]
     }
   ],
   "settings": [
-    {"key": "speedUnit", "label": "Speed unit", "type": "choice", "default": "mph",
-     "options": [["kmh", "km/h"], ["mph", "mph"]]},
-    {"key": "tempUnit", "label": "Temperature unit", "type": "choice", "default": "c",
-     "options": [["c", "Celsius"], ["f", "Fahrenheit"]]},
-    {"key": "shiftRpm", "label": "Rev bar blinks from", "type": "number", "unit": "rpm", "default": 6800, "min": 4000, "max": 7300, "step": 100},
-    {"key": "accent", "label": "Red", "type": "choice", "default": "signal",
-     "options": [["signal", "Signal red"], ["m", "M red"], ["orange", "Orange red"], ["pink", "Pink red"]]}
+    {
+      "key": "speedUnit",
+      "label": "Speed unit",
+      "type": "choice",
+      "default": "mph",
+      "options": [
+        [
+          "kmh",
+          "km/h"
+        ],
+        [
+          "mph",
+          "mph"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "Temperature unit",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "Celsius"
+        ],
+        [
+          "f",
+          "Fahrenheit"
+        ]
+      ]
+    },
+    {
+      "key": "shiftRpm",
+      "label": "Rev bar blinks from",
+      "type": "number",
+      "unit": "rpm",
+      "default": 6800,
+      "min": 4000,
+      "max": 7300,
+      "step": 100
+    },
+    {
+      "key": "accent",
+      "label": "Red",
+      "type": "choice",
+      "default": "signal",
+      "options": [
+        [
+          "signal",
+          "Signal red"
+        ],
+        [
+          "m",
+          "M red"
+        ],
+        [
+          "orange",
+          "Orange red"
+        ],
+        [
+          "pink",
+          "Pink red"
+        ]
+      ]
+    }
   ]
 }

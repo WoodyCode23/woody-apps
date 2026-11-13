@@ -65,7 +65,7 @@ async function background(bg) {
     });
     await taps.start();
 
-    /* Woody HUD's menu: "Ambient: next colour" bumps n in /dev/shm/woody/ambient.json */
+    /* HUD's menu: "Ambient: next colour" bumps n in /dev/shm/woody/ambient.json */
     let menuN = (shared.read('ambient.json') || {}).n || 0;
     const menuTimer = setInterval(() => {
         const a = shared.read('ambient.json');

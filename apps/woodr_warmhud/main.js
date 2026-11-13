@@ -49,7 +49,7 @@ async function background(bg) {
     };
     /* double-tap the high-beam-assistant button (left stalk): hide / show the HUD for this drive. Two taps toggle
      * the assistant back where it was, so the car's own function is untouched. */
-    /* Woody HUD's menu, when it runs, owns the double-tap: its choice comes through /dev/shm/woody/hud.json */
+    /* HUD's menu, when it runs, owns the double-tap: its choice comes through /dev/shm/woody/hud.json */
     const woodyHud = () => !!shared.read('hud.json', 0);
     const taps = new Taps(bg, (n) => { if (n === 2 && bg.settings.get('taps') === true && !woodyHud()) { hud.toggle(); tick(); } });
     let menuSeen = null;
@@ -60,7 +60,7 @@ async function background(bg) {
         menuSeen = w;
         hud.user = w === 'hide' ? 'hide' : w === 'show' ? 'show' : null;
         hud.lastKey = '';
-        bg.log.info('hud: from the Woody HUD menu -> ' + w);
+        bg.log.info('hud: from the HUD menu -> ' + w);
     };
     taps.start().catch((e) => bg.log.warn('taps: ' + e));
     const timer = setInterval(tick, 1000);

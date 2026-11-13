@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Woody HUD - a menu on the head-up display worked from the steering wheel, a rev bar across the top of the
+ * HUD - a menu on the head-up display worked from the steering wheel, a rev bar across the top of the
  * display, and the song CarPlay is playing as one line above it.
  *
  * MENU   The wheel's menu button opens it and the right roller moves the highlight. The menu button again picks
@@ -277,7 +277,7 @@ mgu.run({
             line('Last pick', bgm.st.lastPick || '-', 316);
             const sn = bgm.song.now;
             line('Song', settings.get('song') === false ? 'off' : sn ? (sn.title + (sn.artist ? ', ' + sn.artist : '')).slice(0, 44) : bgm.song.error ? 'not available' : 'nothing playing', 350);
-            G.frame(cv, t, ['Woody HUD'], 0, []);
+            G.frame(cv, t, ['HUD'], 0, []);
             await ui.image('MAIN_GFX', cv);
         }
         ui.onClick('BTN_ACTION', () => { bgm.pick('shift'); return render(); });

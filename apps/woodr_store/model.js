@@ -1,6 +1,6 @@
 'use strict';
 /**
- * The updater's state shaped for Woody Apps: components grouped by developer (their source),
+ * The updater's state shaped for BimmerApps Hub: components grouped by developer (their source),
  * yours first, with what each one needs and what it is doing.
  */
 const MINE = 'woody-apps';

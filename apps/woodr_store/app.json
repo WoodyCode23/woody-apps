@@ -1,8 +1,8 @@
 {
   "id": "woodr_store",
-  "title": "Woody Apps",
+  "title": "BimmerApps Hub",
   "description": "Your own store for this car: every source grouped by developer, versions, what each app needs, install and update. Runs on mgu-updater and mgu-deploy.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "vendor": "custom",
   "loggingId": "OAAA",
   "iconGlyph": "live_data",
@@ -13,7 +13,7 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "Woody Apps",
+      "title": "BimmerApps Hub",
       "buttons": [
         [
           "BTN_ACTION",

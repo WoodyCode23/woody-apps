@@ -2,8 +2,8 @@
 /**
  * shared.js - small files in /dev/shm/woody that let the Woody apps steer each other without sockets.
  *
- *   hud.json     written by Woody HUD's menu: { warmup: 'auto' | 'hide' | 'show', at }   (Warm-Up HUD reads it)
- *   ambient.json written by Woody HUD's menu: { cmd: 'next', n, at }                      (Ambient Studio reads it)
+ *   hud.json     written by HUD's menu: { warmup: 'auto' | 'hide' | 'show', at }   (Warm-Up HUD reads it)
+ *   ambient.json written by HUD's menu: { cmd: 'next', n, at }                      (Ambient Studio reads it)
  *
  * Each app runs as its own user, so the folder is 1777 (anyone writes, only a file's owner replaces it) and the
  * files 0644. Written whole (temp file renamed over), so a reader never sees half a file. tmpfs: gone at the
