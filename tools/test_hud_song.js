@@ -23,7 +23,8 @@ const meta = (title, artist, cover) => [{ key: 'TITLE', value: { stringValue: ti
     ok('read: no title, no song', read([{ key: 'ARTIST', value: { stringValue: 'A' } }]) === null);
 
     let changes = 0;
-    const song = new Song(ctx, () => { changes++; });
+    let quiet = true;
+    const song = new Song(ctx, () => { changes++; }, { quiet: () => quiet, coverDelayMs: 40 });
     await song.start();
     handlers.currentItemMetadata(meta('One', 'Artist'));
     ok('a track is taken', song.now && song.now.title === 'One' && changes === 1);
@@ -83,6 +84,26 @@ const meta = (title, artist, cover) => [{ key: 'TITLE', value: { stringValue: ti
         console.log('     ' + (lines.filter((l) => /cover shown/.test(l))[0] || 'no "shown" line'));
         handlers.currentItemMetadata(meta('Three', 'Artist'));
         ok('a track without a cover clears it', song.cover === null);
+        const shownLines = lines.filter((l) => /cover shown/.test(l)).length;
+        handlers.currentItemMetadata(meta('Two', 'Artist', jpg));
+        ok('a cover decoded before comes back at once, without decoding again', !!song.cover && lines.filter((l) => /cover shown/.test(l)).length === shownLines);
+        /* the engine being worked: a new cover waits, then is decoded once it is quiet again */
+        const copy = path.join(tmp, 'again.jpg');
+        fs.writeFileSync(copy, fs.readFileSync(jpg));
+        quiet = false;
+        handlers.currentItemMetadata(meta('Four', 'Artist', copy));
+        await sleep(600);
+        ok('with the engine working no cover is decoded', song.cover === null);
+        quiet = true;
+        await sleep(4500);
+        ok('and it is decoded once the engine is quiet', !!song.cover);
+        /* two files named in quick succession for one track: only the last is decoded */
+        const c1 = path.join(tmp, 'first.jpg'), c2 = path.join(tmp, 'second.jpg');
+        fs.writeFileSync(c1, fs.readFileSync(jpg)); fs.writeFileSync(c2, fs.readFileSync(jpg));
+        handlers.currentItemMetadata(meta('Five', 'Artist', c1));
+        handlers.currentItemMetadata(meta('Five', 'Artist', c2));
+        await sleep(2500);
+        ok('two files in a row: one decode, of the last', song.coverCache[0].file === c2 && !song.coverCache.some((c) => c.file === c1));
     } else console.log('skip the real JPEG (no file given)');
 
     const sq = shrink(Buffer.from([255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255, 255, 0, 0, 255]), 2, 2, 1);

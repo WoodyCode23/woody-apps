@@ -68,7 +68,8 @@ async function background(bg) {
     } else log.warn('cluster_render_client missing');
     let menuLayer = 0, frameLayer = 0, frameKey = '', frameVisible = false;
     let barLayer = 0, barGeom = '', barKey = '', barVisible = false, songLayer = 0, songKey = '', songGeom = '';
-    const song = new Song(bg, () => { songKey = ''; });
+    /* a cover is decoded only while the engine is off or near idle: the decode holds this app up for about a second */
+    const song = new Song(bg, () => { songKey = ''; }, { quiet: () => { const d = car.data ? car.data() : car.live; return !(d && typeof d.rpm === 'number' && d.rpm > 1500); } });
     song.start().catch((e) => log.info('song: ' + e));
 
     shared.write('hud.json', { warmup: 'auto' });
