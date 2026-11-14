@@ -58,6 +58,25 @@ const LIST = [
     fs.writeFileSync(file, hud.png(6));
     console.log(file);
 });
+/* the top level: Highlight, one row per group, Close; and inside one group, with its Back row */
+(() => {
+    const groups = [];
+    LIST.forEach((it) => { if (it.kind !== 'close' && groups.indexOf(it.g) < 0) groups.push(it.g); });
+    const top = [{ g: 'Menu', label: 'Highlight this clip', kind: 'action', value: 'Mark' }]
+        .concat(groups.map((g) => ({ g: 'Menu', label: g, kind: 'group', value: LIST.filter((it) => it.g === g).length })))
+        .concat([{ g: 'Menu', label: 'Close', kind: 'close', value: '' }]);
+    const inside = LIST.filter((it) => it.g === 'HUD').concat([{ g: 'HUD', label: 'Back', kind: 'back', value: '' }]);
+    [[top, 0, 'Highlight marked', 'top-highlight'], [top, 2, '', 'top-group'], [inside, 1, '', 'inside-group']].forEach((v) => {
+        const hud = new Canvas(800, 480).clear('#101014');
+        hud.fillRect(120, 100, 570, 278, '#000000');
+        const m = new Canvas(menu.MENU.w, menu.MENU.h);
+        menu.draw(m, v[0], v[1], v[2], 0.8);
+        paste(hud, m, menu.MENU.x, menu.MENU.y);
+        const file = path.join(out, 'menu-' + v[3] + '.png');
+        fs.writeFileSync(file, hud.png(6));
+        console.log(file);
+    });
+})();
 /* a short menu (three rows) must not wrap round on screen, and a long song must leave room for the time */
 (() => {
     const hud = new Canvas(800, 480).clear('#101014');

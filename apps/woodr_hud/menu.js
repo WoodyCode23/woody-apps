@@ -7,7 +7,7 @@
  *   thin rule    above a row that starts a new group
  *   below        one line that says what the last press did, and a bar that shrinks to the automatic close
  *
- * A row: { g: group, label, kind: 'bool' | 'choice' | 'action' | 'close', value, options: [[value, label]] }.
+ * A row: { g: group, label, kind: 'bool' | 'choice' | 'action' | 'group' | 'back' | 'close', value, options: [[value, label]] }.
  * Kept apart from main.js so tools/render_hud_menu.js can draw the same picture on a PC.
  */
 const MENU = { x: 140, y: 146, w: 530, h: 226 };      /* inside the display's visible 570 x 278, under the rev bar */
@@ -20,6 +20,8 @@ const ROWS = [{ o: -2, y: 28, size: 15 }, { o: -1, y: 49, size: 20 }, { o: 0, y:
 function valueText(it, value) {
     const v = value === undefined ? it.value : value;
     if (it.kind === 'bool') return v ? 'On' : 'Off';
+    if (it.kind === 'group') return v + '  >';      /* how many rows are inside, and that a press goes in */
+    if (it.kind === 'back' || it.kind === 'close') return '';
     if (it.kind === 'choice') {
         const o = (it.options || []).filter((x) => x[0] === v)[0];
         return o ? String(o[1]) : String(v === undefined || v === null ? '' : v);
@@ -29,6 +31,7 @@ function valueText(it, value) {
 function valueColour(it) {
     if (it.kind === 'bool') return it.value ? GREEN : DIM;
     if (it.kind === 'action') return AMBER;
+    if (it.kind === 'group') return DIM;
     return WHITE;
 }
 

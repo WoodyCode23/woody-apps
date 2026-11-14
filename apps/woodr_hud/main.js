@@ -6,8 +6,9 @@
  * MENU   The wheel's menu button opens it and the right roller moves through it: a roller of five rows with the
  *        chosen one large (menu.js). The menu button again acts on the chosen row and the menu STAYS OPEN: a
  *        switch flips, a choice steps to its next option, an action runs, and a line says what happened.
- *        It closes after 10 s without a touch or from its Close row, and opens again on the row used last.
- *        Rows: this app's own switches, a few quick actions, then every other running app's switches and
+ *        It closes after 10 s without a touch or from its Close row. Two levels: the top one is short, Highlight
+ *        this clip, then one row per group (this app, the quick actions, every other running app), then Close;
+ *        a press on a group opens its rows, and its Back row returns. An app's rows are its switches and
  *        choices (kit/hudlink.js; settings only, the app that owns one applies it). The car opens its own
  *        list with the same button whatever an app does, so the roller's press is left alone: it would
  *        pick in the car's list.
@@ -55,7 +56,7 @@ async function background(bg) {
     const { log, settings } = bg;
     const car = new Car(bg, ['rpm']);
     const waze = new Waze(log);
-    const st = { menuOpen: false, at: 0, sel: '', say: '', sayUntil: 0, pending: null, openedAt: 0, warmup: 'auto', shiftOn: settings.get('shift') !== false, stage: '', box: null, lastPick: '' };
+    const st = { menuOpen: false, at: 0, group: null, sels: {}, say: '', sayUntil: 0, pending: null, openedAt: 0, warmup: 'auto', shiftOn: settings.get('shift') !== false, stage: '', box: null, lastPick: '' };
     const cr = ClusterRender ? new ClusterRender(APP_ID) : null;
     if (cr) {
         cr.on('layer', (ref, s, why) => log.info('hud layer ' + ref + ': ' + s + (why ? ' (' + why + ')' : '')));
@@ -74,26 +75,42 @@ async function background(bg) {
     const sizeAt = () => sizeIx;
     const idOf = (it) => (it.app || '') + '|' + it.key;
 
-    /** every row: this app's switches and choices, the quick actions, every other running app's, then Close */
-    function items() {
+    /** every setting and action there is, each with its group: this app's, the quick actions, every other running app's */
+    function all() {
         const list = [];
         const row = (g, app) => (x) => list.push({ g: g, app: app, key: x.key, label: x.label, kind: x.type, value: x.value, options: x.options });
-        /* first, so it is one press away when the menu opens fresh: keep the clip the dash cam is recording now */
-        list.push({ g: 'Dashcam', app: null, key: 'highlight', kind: 'action', label: 'Highlight this clip', value: 'Mark' });
         hudlink.offered(bg.spec && bg.spec.settings, settings).forEach(row('HUD', null));
-        list.push({ g: 'Quick', app: null, key: 'warmup', kind: 'action', label: 'Warm-Up', value: st.warmup === 'hide' ? 'Hidden' : 'Shown' });
-        list.push({ g: 'Quick', app: null, key: 'waze', kind: 'action', label: 'Waze map', value: SIZES[sizeAt()][0] });
-        list.push({ g: 'Quick', app: null, key: 'ambient', kind: 'action', label: 'Ambient colour', value: 'Next' });
-        list.push({ g: 'Quick', app: null, key: 'test', kind: 'action', label: 'Test the rev bar', value: 'Run' });
+        list.push({ g: 'Quick actions', app: null, key: 'warmup', kind: 'action', label: 'Warm-Up', value: st.warmup === 'hide' ? 'Hidden' : 'Shown' });
+        list.push({ g: 'Quick actions', app: null, key: 'waze', kind: 'action', label: 'Waze map', value: SIZES[sizeAt()][0] });
+        list.push({ g: 'Quick actions', app: null, key: 'ambient', kind: 'action', label: 'Ambient colour', value: 'Next' });
+        list.push({ g: 'Quick actions', app: null, key: 'test', kind: 'action', label: 'Test the rev bar', value: 'Run' });
         try { hudlink.apps(APP_ID).forEach((a) => a.items.forEach(row(a.title, a.id))); } catch (e) { log.warn('menu: apps: ' + e); }
-        list.push({ g: 'Menu', app: null, key: 'close', kind: 'close', label: 'Close', value: '' });
         /* a change asked of another app shows at once, until that app has had time to answer with its own value */
         const p = st.pending;
         if (p && Date.now() < p.until) list.forEach((it) => { if (idOf(it) === p.id) it.value = p.value; });
-        /* the chosen row follows its item when apps come and go */
-        const at = st.sel ? list.findIndex((it) => idOf(it) === st.sel) : -1;
-        st.at = at >= 0 ? at : Math.max(0, Math.min(st.at, list.length - 1));
-        st.sel = idOf(list[st.at]);
+        return list;
+    }
+
+    /**
+     * The rows on the display now. Top level: Highlight, one row per group (an app, or the quick actions) and
+     * Close. Inside a group: its rows and Back. Each level remembers its own chosen row while the menu is open.
+     */
+    function items() {
+        const every = all(), groups = [];
+        every.forEach((it) => { if (groups.indexOf(it.g) < 0) groups.push(it.g); });
+        if (st.group && groups.indexOf(st.group) < 0) st.group = null;      /* its app stopped while we were in it */
+        let list;
+        if (!st.group) {
+            list = [{ g: 'Menu', app: null, key: 'highlight', kind: 'action', label: 'Highlight this clip', value: 'Mark' }]
+                .concat(groups.map((g) => ({ g: 'Menu', app: null, key: 'group ' + g, kind: 'group', label: g, group: g, value: every.filter((it) => it.g === g).length })))
+                .concat([{ g: 'Menu', app: null, key: 'close', kind: 'close', label: 'Close', value: '' }]);
+        } else {
+            list = every.filter((it) => it.g === st.group).concat([{ g: st.group, app: null, key: 'back', kind: 'back', label: 'Back', value: '' }]);
+        }
+        const level = st.group || '', sel = st.sels[level];
+        const at = sel ? list.findIndex((it) => idOf(it) === sel) : -1;
+        st.at = at >= 0 ? at : 0;
+        st.sels[level] = idOf(list[st.at]);
         return list;
     }
 
@@ -104,7 +121,7 @@ async function background(bg) {
         const idle = Math.max(0, 1 - (Date.now() - (st.touched || 0)) / IDLE_MS);
         const say = Date.now() < st.sayUntil ? st.say : '';
         /* redrawn only when something on it changed; the idle bar moves in ten steps */
-        const key = st.at + '|' + say + '|' + Math.ceil(idle * 10) + '|' + list.map((it) => it.label + '=' + it.value).join(';');
+        const key = (st.group || '') + '|' + st.at + '|' + say + '|' + Math.ceil(idle * 10) + '|' + list.map((it) => it.label + '=' + it.value).join(';');
         if (!menuLayer) {
             /* yield 0: the menu stays on the HUD when BMW's own list pop-up opens with the same button (cluster-render
              * then leaves the HUD to us and BMW's list shows on the cluster instead; seen on the car 2026-11-11:
@@ -136,7 +153,7 @@ async function background(bg) {
             try {
                 if (done) return;
                 const now = shared.read('dashcam.highlighted.json');
-                if (now && now.at && now.at !== was) { done = true; say('Highlight marked' + (typeof now.count === 'number' ? ' (' + now.count + ' this drive)' : '')); log.info('menu: highlight marked'); }
+                if (now && now.at && now.at !== was) { done = true; say(now.ok === false ? 'Highlight: ' + String(now.note || 'not recording').slice(0, 60) : 'Highlight marked' + (typeof now.count === 'number' && now.count > 0 ? ' (' + now.count + ' this drive)' : '')); log.info('menu: highlight marked'); }
                 else if (last) { done = true; say('Dashcam is not running'); log.info('menu: highlight not answered'); }
                 else return;
                 if (st.menuOpen) showMenu(true);
@@ -161,6 +178,8 @@ async function background(bg) {
     function act(it) {
         if (!it) return;
         if (it.kind === 'close') { closeMenu(); log.info('menu: closed (Close)'); return; }
+        if (it.kind === 'group') { st.group = it.group; st.say = ''; log.info('menu: into ' + it.group); return; }
+        if (it.kind === 'back') { st.group = null; st.say = ''; log.info('menu: back'); return; }
         if (it.kind === 'action') { pick(it.key); return; }
         const to = hudlink.next(it);
         st.lastPick = (it.app ? it.app + ' ' : '') + it.key;
@@ -182,7 +201,8 @@ async function background(bg) {
         onMenu: () => {
             if (settings.get('menu') === false) return;
             st.touched = Date.now();
-            if (!st.menuOpen) { st.menuOpen = true; st.say = ''; showMenu(true); log.info('menu: open'); return; }
+            /* always opens at the top level on its first row, Highlight: open and press is all a highlight takes */
+            if (!st.menuOpen) { st.menuOpen = true; st.say = ''; st.group = null; st.sels = {}; showMenu(true); log.info('menu: open'); return; }
             act(items()[st.at]);
             if (st.menuOpen) showMenu(true);
         },
@@ -191,7 +211,7 @@ async function background(bg) {
             const list = items(), n = list.length;
             /* on the car rolling the roller DOWN reports 127 - n (d < 0), and down must go to the next item */
             st.at = ((st.at + (d < 0 ? 1 : -1)) % n + n) % n;
-            st.sel = idOf(list[st.at]);
+            st.sels[st.group || ''] = idOf(list[st.at]);
             st.touched = Date.now();
             showMenu(true);
         },
