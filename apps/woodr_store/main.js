@@ -33,8 +33,7 @@ const VERSION = (() => { try { return String(require('./kit/app-spec.json').vers
 (() => {
     try {
         const sock = require('net').connect(process.env.MGU_UPDATER_SOCK || '/dev/shm/mgu-updater/updater.sock');
-        sock.on('connect', () => { sock.write(JSON.stringify({ op: 'hello', id: APP_ID, version: VERSION }) + '
-'); setTimeout(() => sock.destroy(), 2000).unref(); });
+        sock.on('connect', () => { sock.write(JSON.stringify({ op: 'hello', id: APP_ID, version: VERSION }) + '\n'); setTimeout(() => sock.destroy(), 2000).unref(); });
         sock.on('error', () => {});
         sock.on('data', () => {});
         sock.unref();
