@@ -130,7 +130,8 @@ async function background(bg) {
         onRoll: (d) => {
             if (!st.menuOpen) return;
             const n = items().length;
-            st.at = ((st.at + (d > 0 ? 1 : -1)) % n + n) % n;
+            /* on the car rolling the roller DOWN reports 127 - n (d < 0), and down must go to the next item */
+            st.at = ((st.at + (d < 0 ? 1 : -1)) % n + n) % n;
             st.touched = Date.now();
             showMenu();
         },
