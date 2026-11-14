@@ -91,6 +91,18 @@ const SCHEMA = [
     fs.writeFileSync(path.join(hud.DIR, 'liar.json'), JSON.stringify({ id: 'someone_else', at: Date.now(), items: [{ key: 'a', type: 'bool', value: true }] }));
     ok('a broken file and a file under another app\'s name are skipped', hud.apps().length === 0);
 
+    /* a hostile file: huge texts, too many items and options, odd values. Listed cut to size, or not at all. */
+    const big = 'x'.repeat(200000);
+    fs.writeFileSync(path.join(hud.DIR, 'evil.json'), JSON.stringify({ id: 'evil', title: big.slice(0, 500), at: Date.now(), items: [
+        { key: 'a', label: big.slice(0, 5000), type: 'bool', value: 'yes' },
+        { key: 'b', label: 'B', type: 'choice', value: { x: 1 }, options: Array.from({ length: 300 }, (_, i) => [i, big.slice(0, 900)]) },
+        { key: big.slice(0, 900), label: 'k', type: 'bool', value: true }, { key: 'c', type: 'choice', options: [{ a: 1 }] },
+    ].concat(Array.from({ length: 500 }, (_, i) => ({ key: 'n' + i, label: 'n', type: 'bool', value: true }))) }));
+    const evil = hud.apps().filter((a) => a.id === 'evil')[0];
+    ok('a hostile file is cut to size', !!evil && evil.title.length === 40 && evil.items.length <= 40 && evil.items[0].label.length === 48 && evil.items[0].value === false
+        && evil.items[1].options.length === 12 && evil.items[1].options[0][1].length === 32 && evil.items[1].value === null && !evil.items.some((i) => i.key.length > 64 || i.key === 'c'));
+    fs.writeFileSync(path.join(hud.DIR, 'huge.json'), JSON.stringify({ id: 'huge', at: Date.now(), items: [{ key: 'a', label: big, type: 'bool', value: true }] }));
+    ok('a file over the size limit is not read', !hud.apps().some((a) => a.id === 'huge'));
     console.log(failed ? 'FAILED: ' + failed : 'all ok');
     process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

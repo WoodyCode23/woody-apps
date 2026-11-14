@@ -34,7 +34,7 @@ function valueColour(it) {
 
 /** text cut to fit maxW, with an ellipsis */
 function fit(cv, s, size, maxW, opts) {
-    s = String(s);
+    s = String(s).slice(0, 120);      /* never more work than this, whatever the text is */
     if (cv.textWidth(s, size, opts) <= maxW) return s;
     while (s.length > 1 && cv.textWidth(s + '…', size, opts) > maxW) s = s.slice(0, -1);
     return s.replace(/\s+$/, '') + '…';

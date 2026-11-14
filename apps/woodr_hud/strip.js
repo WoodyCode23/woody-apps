@@ -25,7 +25,7 @@ function drawBar(cv, w, h, filled, colourAt) {
 const AMBER = '#ffb31a';
 
 function fit(cv, s, size, maxW, opts) {
-    s = String(s);
+    s = String(s).slice(0, 120);      /* never more work than this, whatever the text is */
     if (maxW <= 0) return '';
     if (cv.textWidth(s, size, opts) <= maxW) return s;
     while (s.length > 1 && cv.textWidth(s + '…', size, opts) > maxW) s = s.slice(0, -1);

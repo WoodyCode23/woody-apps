@@ -35,6 +35,8 @@ const BEAT_MS = 10000;                /* an app says "still here" this often */
 const POLL_MS = 400;                  /* how often an app looks for a request */
 const STALE_MS = 35000;               /* an app not heard from for this long is not listed */
 const REQ_MAX_AGE_MS = 5000;          /* a request older than this is never applied */
+/* what the HUD takes from another app's file, whatever that file holds: any app on the unit can write one */
+const MAX_FILE = 64 * 1024, MAX_ITEMS = 40, MAX_OPTIONS = 12, MAX_TITLE = 40, MAX_LABEL = 48, MAX_OPTION = 32, MAX_KEY = 64;
 
 function folder() {
     [ROOT, DIR].forEach((d) => {
@@ -50,7 +52,25 @@ function writeWhole(file, obj) {
     fs.renameSync(tmp, file);
 }
 
-function readJson(file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return null; } }
+function readJson(file) {
+    try {
+        if (fs.statSync(file).size > MAX_FILE) return null;
+        return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch (e) { return null; }
+}
+
+const cut = (v, n) => String(v === undefined || v === null ? '' : v).slice(0, n);
+const plain = (v) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+
+/** One item from another app's file, cut to size and to the fields the menu uses, or null when it is not usable. */
+function clean(it) {
+    if (!it || typeof it.key !== 'string' || !it.key || it.key.length > MAX_KEY) return null;
+    if (it.type === 'bool') return { key: it.key, label: cut(it.label || it.key, MAX_LABEL), type: 'bool', value: it.value === true };
+    if (it.type !== 'choice' || !Array.isArray(it.options)) return null;
+    const options = it.options.slice(0, MAX_OPTIONS).filter((o) => Array.isArray(o) && plain(o[0])).map((o) => [typeof o[0] === 'string' ? cut(o[0], MAX_KEY) : o[0], cut(o[1] === undefined ? o[0] : o[1], MAX_OPTION)]);
+    if (!options.length) return null;
+    return { key: it.key, label: cut(it.label || it.key, MAX_LABEL), type: 'choice', value: plain(it.value) ? it.value : null, options: options };
+}
 
 const safeId = (id) => /^[a-z0-9_]{1,64}$/.test(String(id));
 
@@ -142,8 +162,8 @@ function apps(except) {
         const a = readJson(path.join(DIR, name));
         if (!a || a.id !== name.slice(0, -5) || a.id === except || !Array.isArray(a.items) || !a.items.length) return;
         if (typeof a.at !== 'number' || now - a.at > STALE_MS) return;
-        const items = a.items.filter((it) => it && typeof it.key === 'string' && (it.type === 'bool' || (it.type === 'choice' && Array.isArray(it.options) && it.options.length)));
-        if (items.length) out.push({ id: a.id, title: String(a.title || a.id), version: String(a.version || ''), items: items });
+        const items = a.items.slice(0, MAX_ITEMS).map(clean).filter(Boolean);
+        if (items.length) out.push({ id: a.id, title: cut(a.title || a.id, MAX_TITLE), version: cut(a.version, 20), items: items });
     });
     return out.sort((x, y) => (x.title < y.title ? -1 : x.title > y.title ? 1 : 0));
 }
