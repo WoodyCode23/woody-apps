@@ -23,7 +23,11 @@ const CAR = '__car';                  /* the "Wi-Fi, sources, restart" page, ope
 const { Progress } = require('./progress');
 
 const W = 1600, H = 520;
-const APP_ID = 'woodr_store', VERSION = '1.0.2';
+const APP_ID = 'woodr_store';
+/* The version said to the updater must be the installed one: after an update the updater waits for the Store to
+ * say hello with the new version and goes back to the old one if it does not. So it is read from the build's
+ * spec (written from app.json), never typed here. */
+const VERSION = (() => { try { return String(require('./kit/app-spec.json').version); } catch (e) { return '0'; } })();
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 
