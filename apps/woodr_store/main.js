@@ -28,6 +28,18 @@ const APP_ID = 'woodr_store';
  * say hello with the new version and goes back to the old one if it does not. So it is read from the build's
  * spec (written from app.json), never typed here. */
 const VERSION = (() => { try { return String(require('./kit/app-spec.json').version); } catch (e) { return '0'; } })();
+/* Said as soon as the process runs, before any screen: the first start after an update is a start without screens
+ * (the app manager's set-up start), and the updater gives the new version only two minutes to say hello. */
+(() => {
+    try {
+        const sock = require('net').connect(process.env.MGU_UPDATER_SOCK || '/dev/shm/mgu-updater/updater.sock');
+        sock.on('connect', () => { sock.write(JSON.stringify({ op: 'hello', id: APP_ID, version: VERSION }) + '
+'); setTimeout(() => sock.destroy(), 2000).unref(); });
+        sock.on('error', () => {});
+        sock.on('data', () => {});
+        sock.unref();
+    } catch (e) { /* off the car */ }
+})();
 const ROW = 58, HEAD = 44;
 const GREEN = '#2fd27a', AMBER = '#ffd34d', ORANGE = '#ff9d3b';
 

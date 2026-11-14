@@ -2,7 +2,7 @@
   "id": "woodr_store",
   "title": "BimmerApps Hub",
   "description": "Your own store for this car: every source grouped by developer, versions, what each app needs, install and update. Runs on mgu-updater and mgu-deploy.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "vendor": "custom",
   "loggingId": "OAAA",
   "iconGlyph": "live_data",
