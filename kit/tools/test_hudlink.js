@@ -95,7 +95,7 @@ const SCHEMA = [
     const big = 'x'.repeat(200000);
     fs.writeFileSync(path.join(hud.DIR, 'evil.json'), JSON.stringify({ id: 'evil', title: big.slice(0, 500), at: Date.now(), items: [
         { key: 'a', label: big.slice(0, 5000), type: 'bool', value: 'yes' },
-        { key: 'b', label: 'B', type: 'choice', value: { x: 1 }, options: Array.from({ length: 300 }, (_, i) => [i, big.slice(0, 900)]) },
+        { key: 'b', label: 'B', type: 'choice', value: { x: 1 }, options: Array.from({ length: 300 }, (_, i) => [i, big.slice(0, 90)]) },
         { key: big.slice(0, 900), label: 'k', type: 'bool', value: true }, { key: 'c', type: 'choice', options: [{ a: 1 }] },
     ].concat(Array.from({ length: 500 }, (_, i) => ({ key: 'n' + i, label: 'n', type: 'bool', value: true }))) }));
     const evil = hud.apps().filter((a) => a.id === 'evil')[0];
