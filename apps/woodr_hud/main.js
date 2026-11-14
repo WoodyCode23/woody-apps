@@ -223,7 +223,7 @@ async function background(bg) {
             if (stage !== st.stage) log.info('shift: ' + (stage || 'off') + (rpm !== null ? ' at ' + Math.round(rpm) + ' rpm' : '') + (testLeft > 0 ? ' (test)' : ''));
             st.stage = stage;
             const running = testLeft > 0 || (rpm !== null && rpm > 400);
-            if (running) showSong(); else hideSong();
+            showSong();              /* the song line is up whenever CarPlay names a track, engine or not (its switch is in the settings) */
             if (settings.get('style') !== 'frame') {
                 /* the rev bar: shown whenever the engine runs, whatever the stage; the old frame stays away */
                 hideFrame();
