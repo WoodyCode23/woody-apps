@@ -41,6 +41,19 @@ const meta = (title, artist, cover) => [{ key: 'TITLE', value: { stringValue: ti
     handlers.currentItemTime({ elapsed: 30, total: 200 });
     ok('a total too small for milliseconds is read as seconds', Math.abs(song.progress().left - 170) < 1);
 
+    handlers.currentItemTime({ elapsed: 0, total: 4294967295 });
+    ok('a track still loading (total all bits set) has no progress', song.progress() === null);
+    handlers.currentItemTime({ elapsed: 0, total: 0 });
+    ok('no CarPlay (0 of 0) has no progress', song.progress() === null);
+    handlers.currentItemTime({ elapsed: 50000, total: 40000 });
+    ok('an elapsed time past the total is not believed', song.progress() === null);
+    handlers.playerState('PLAYER_STATE_UNKNOWN');
+    handlers.currentItemTime({ elapsed: 30000, total: 200000 });
+    const frozen = song.progress().left;
+    await sleep(600);
+    ok('player state UNKNOWN does not run the clock', Math.abs(song.progress().left - frozen) < 0.05);
+    handlers.playerState('PLAYER_STATE_PLAY');
+
     /* covers */
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hudsong-'));
     handlers.currentItemMetadata(meta('One', 'Artist', path.join(tmp, 'missing.jpg')));
