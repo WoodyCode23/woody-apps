@@ -23,6 +23,10 @@
  *   r.cameraStream(name, onFrame, onEnd) -> stop()     live JPEG frames, when the relay has them
  *   r.fresh()                                was the house state confirmed within FRESH_MS?
  *
+ * The link from a car is patchy (lookups time out, sockets are dropped), so one failed poll is not "offline":
+ * the poll is retried at once on a kept-alive connection, and the screens keep the last confirmed state until
+ * it is FRESH_MS old. What a tile may do is decided by the relay on every press, never by what the car shows.
+ *
  * Nothing here throws out of a callback (an uncaught error exits the app).
  */
 const fs = require('fs');
@@ -37,8 +41,10 @@ const netlease = require('./netlease');
 const WAIT_S = 20;                    /* long-poll hold; the socket timeout sits above it */
 const POLL_TIMEOUT_MS = 30000;
 const CALL_TIMEOUT_MS = 10000;
-const FRESH_MS = 40000;
+const FRESH_MS = 90000;               /* how long the last confirmed state stays on the screen without a new one */
+const QUICK_RETRY_MS = 300;           /* the first failed poll is tried again at once */
 const BACKOFF_MS = [2000, 5000, 10000, 30000];
+const OFFLINE_AFTER = 3;              /* failed polls in a row before the link counts as down */
 const JPEG_START = Buffer.from([0xff, 0xd8, 0xff]), JPEG_END = Buffer.from([0xff, 0xd9]);
 const MAX_REPLY = 2 * 1024 * 1024;    /* a 640 px camera JPEG is ~20-60 KB */
 
@@ -72,6 +78,10 @@ class Relay extends EventEmitter {
         this.timer = null;
         this.fails = 0;
         this.req = null;
+        this.agents = null;           /* kept-alive connections, so a poll is not a new lookup and handshake */
+        this.downSince = 0;           /* when the first poll of this run of failures failed */
+        this.staleTimer = null;
+        this.lastReason = '';
     }
 
     /* ---------------- configuration ---------------- */
@@ -99,7 +109,11 @@ class Relay extends EventEmitter {
     start() {
         this.stopped = false;
         this.load();
-        this.log.info('relay: ' + this.state + (this.base ? ' (' + this.base.host + ')' : ''));
+        this.lastOk = 0;
+        this.online = false;
+        this.fails = 0;
+        this.downSince = 0;
+        this.log.info('relay: ' + this.state);            /* never the address: logs are pulled for reports */
         if (this.state === 'paired') this._pollSoon(0);
         this._changed();
     }
@@ -108,10 +122,36 @@ class Relay extends EventEmitter {
         this.stopped = true;
         if (this.timer) clearTimeout(this.timer);
         this.timer = null;
+        if (this.staleTimer) clearTimeout(this.staleTimer);
+        this.staleTimer = null;
         if (this.req) { try { this.req.abort(); } catch (e) { /* leaving */ } }
+        if (this.agents) { try { this.agents.http.destroy(); this.agents.https.destroy(); } catch (e) { /* leaving */ } }
+        this.agents = null;
     }
 
-    fresh() { return this.state === 'paired' && this.online && Date.now() - this.lastOk < FRESH_MS; }
+    fresh() { return this.state === 'paired' && this.lastOk > 0 && Date.now() - this.lastOk < FRESH_MS; }
+
+    _agent(plain) {
+        if (!this.agents) {
+            this.agents = { http: new http.Agent({ keepAlive: true, maxSockets: 4 }), https: new https.Agent({ keepAlive: true, maxSockets: 4 }) };
+        }
+        return plain ? this.agents.http : this.agents.https;
+    }
+
+    /** An error text without the relay's address in it, for the log and the screen. */
+    _clean(msg) {
+        const text = String(msg || 'failed');
+        return this.base && this.base.hostname ? text.split(this.base.hostname).join('the relay') : text;
+    }
+
+    /** Redraw when the last confirmed state gets too old, since nothing else changes at that moment. */
+    _staleSoon() {
+        if (this.staleTimer || !this.lastOk) return;
+        const ms = this.lastOk + FRESH_MS - Date.now();
+        if (ms <= 0) return;
+        this.staleTimer = setTimeout(() => { this.staleTimer = null; if (!this.stopped) this._changed(); }, ms + 50);
+        if (this.staleTimer.unref) this.staleTimer.unref();
+    }
 
     /* ---------------- one request ---------------- */
 
@@ -123,15 +163,21 @@ class Relay extends EventEmitter {
             const headers = { Accept: 'application/json' };
             if (this.token) headers['X-Car-Token'] = this.token;
             if (data) { headers['Content-Type'] = 'application/json'; headers['Content-Length'] = data.length; }
-            let done = false;
-            const finish = (err, out) => { if (done) return; done = true; if (track) this.req = null; if (err) reject(err); else resolve(out); };
+            let done = false, timer = null;
+            const finish = (err, out) => {
+                if (done) return;
+                done = true;
+                if (timer) clearTimeout(timer);
+                if (track) this.req = null;
+                if (err) reject(err); else resolve(out);
+            };
             let req;
             try {
                 const plain = this.base.protocol === 'http:';
                 req = (plain ? http : https).request({
                     method: method, host: this.base.hostname, port: this.base.port || (plain ? 80 : 443),
                     path: this.base.pathname.replace(/\/$/, '') + p, headers: headers,
-                    lookup: netlease.lookup, agent: false,
+                    lookup: netlease.lookup, agent: this._agent(plain),
                 }, (res) => {
                     const chunks = [];
                     let size = 0;
@@ -146,7 +192,8 @@ class Relay extends EventEmitter {
                 });
             } catch (e) { return finish(e); }
             if (track) this.req = req;
-            req.setTimeout(timeoutMs || CALL_TIMEOUT_MS, () => { req.abort(); finish(new Error('timed out')); });
+            /* our own clock, not the socket's: a kept-alive socket would carry a socket timeout into its next use */
+            timer = setTimeout(() => { try { req.abort(); } catch (e) { /* already gone */ } finish(new Error('timed out')); }, timeoutMs || CALL_TIMEOUT_MS);
             req.on('error', (e) => finish(e));
             req.end(data || undefined);
         });
@@ -174,7 +221,7 @@ class Relay extends EventEmitter {
             this._changed();
             this._pairWait();
             return true;
-        }).catch((e) => { this.error = 'No connection: ' + e.message; this._changed(); return false; });
+        }).catch((e) => { this.error = 'No connection: ' + this._clean(e.message); this._changed(); return false; });
     }
 
     _pairWait() {
@@ -217,9 +264,14 @@ class Relay extends EventEmitter {
             if (r.status === 401 && r.json && r.json.error === 'bad-token') return this._revoked();
             if (r.status !== 200 || !r.json || !r.json.session) throw new Error('HTTP ' + r.status);
             const j = r.json, was = this.seq;
+            if (!this.online && this.downSince) this.log.info('relay: online after ' + Math.round((Date.now() - this.downSince) / 1000) + ' s');
             this.fails = 0;
+            this.downSince = 0;
+            if (this.staleTimer) { clearTimeout(this.staleTimer); this.staleTimer = null; }
             this.online = true;
             this.lastOk = Date.now();
+            const reason = j.session.unlocked ? 'unlocked' : 'locked (' + String(j.session.reason || '?').slice(0, 40) + ')';
+            if (reason !== this.lastReason) { this.lastReason = reason; this.log.info('relay: session ' + reason); }
             this.error = '';
             this.seq = Number(j.seq) || 0;
             this.session = j.session;
@@ -232,12 +284,18 @@ class Relay extends EventEmitter {
             this._pollSoon(50);
         }).catch((e) => {
             if (this.stopped) return;
-            const was = this.online;
-            this.online = false;
-            this.error = e.message;
-            if (was) this.log.warn('relay: offline (' + e.message + ')');
+            const why = this._clean(e && e.message);
+            this.fails++;
+            if (!this.downSince) this.downSince = Date.now();
+            this.error = why;
+            /* one dropped poll is normal from a car: the link is "down" only after a few, or once the state is old */
+            if (this.online && (this.fails >= OFFLINE_AFTER || !this.fresh())) {
+                this.online = false;
+                this.log.warn('relay: offline (' + why + ', ' + this.fails + ' polls failed)');
+            } else if (this.fails === 1 && this.online) this.log.info('relay: a poll failed (' + why + '), trying again');
+            this._staleSoon();
             this._changed();
-            this._pollSoon(BACKOFF_MS[Math.min(this.fails++, BACKOFF_MS.length - 1)]);
+            this._pollSoon(this.fails === 1 ? QUICK_RETRY_MS : BACKOFF_MS[Math.min(this.fails - 2, BACKOFF_MS.length - 1)]);
         });
     }
 
@@ -248,6 +306,7 @@ class Relay extends EventEmitter {
         this.token = null;
         this.state = 'unpaired';
         this.online = false;
+        this.lastOk = 0;
         this.session = { unlocked: false, reason: 'offline' };
         this.tiles = [];
         this.first = true;
@@ -281,7 +340,7 @@ class Relay extends EventEmitter {
         const once = () => this._http('POST', '/action', body);
         const read = (r) => (r.status === 200 && r.json && r.json.ok) ? { ok: true }
             : { error: (r.json && r.json.error) || ('HTTP ' + r.status), state: r.json && r.json.state };
-        return once().then(read, () => once().then(read, (e) => ({ error: 'no connection (' + e.message + ')' })));
+        return once().then(read, () => once().then(read, (e) => ({ error: 'no connection (' + this._clean(e.message) + ')' })));
     }
 
     lock(reason) {
