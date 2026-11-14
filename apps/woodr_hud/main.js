@@ -78,6 +78,8 @@ async function background(bg) {
     function items() {
         const list = [];
         const row = (g, app) => (x) => list.push({ g: g, app: app, key: x.key, label: x.label, kind: x.type, value: x.value, options: x.options });
+        /* first, so it is one press away when the menu opens fresh: keep the clip the dash cam is recording now */
+        list.push({ g: 'Dashcam', app: null, key: 'highlight', kind: 'action', label: 'Highlight this clip', value: 'Mark' });
         hudlink.offered(bg.spec && bg.spec.settings, settings).forEach(row('HUD', null));
         list.push({ g: 'Quick', app: null, key: 'warmup', kind: 'action', label: 'Warm-Up', value: st.warmup === 'hide' ? 'Hidden' : 'Shown' });
         list.push({ g: 'Quick', app: null, key: 'waze', kind: 'action', label: 'Waze map', value: SIZES[sizeAt()][0] });
@@ -120,9 +122,34 @@ async function background(bg) {
     function closeMenu() { st.menuOpen = false; st.pending = null; if (menuLayer && cr) { cr.drop(menuLayer); menuLayer = 0; } }
     const say = (text) => { st.say = String(text); st.sayUntil = Date.now() + 3500; };
 
+    /**
+     * Ask Dashcam to mark the clip it is storing now (its contract: touch dashcam.highlight.json; it answers in
+     * dashcam.highlighted.json { count, at } within about half a second). No answer in 2 s: it is not running.
+     */
+    function highlight() {
+        const before = shared.read('dashcam.highlighted.json');
+        const was = before && before.at;
+        if (!shared.write('dashcam.highlight.json', { from: 'hud' })) { say('Highlight: could not be sent'); return; }
+        say('Highlight: asking Dashcam');
+        let done = false;
+        const check = (last) => () => {
+            try {
+                if (done) return;
+                const now = shared.read('dashcam.highlighted.json');
+                if (now && now.at && now.at !== was) { done = true; say('Highlight marked' + (typeof now.count === 'number' ? ' (' + now.count + ' this drive)' : '')); log.info('menu: highlight marked'); }
+                else if (last) { done = true; say('Dashcam is not running'); log.info('menu: highlight not answered'); }
+                else return;
+                if (st.menuOpen) showMenu(true);
+            } catch (e) { log.warn('highlight: ' + e); }
+        };
+        [700, 1300].forEach((ms) => setTimeout(check(false), ms));
+        setTimeout(check(true), 2000);
+    }
+
     function pick(key) {
         st.lastPick = key;
         log.info('menu: ' + key);
+        if (key === 'highlight') { highlight(); return; }
         if (key === 'warmup') { st.warmup = st.warmup === 'hide' ? 'show' : 'hide'; shared.write('hud.json', { warmup: st.warmup }); say('Warm-Up: ' + (st.warmup === 'hide' ? 'hidden for this drive' : 'shown')); }
         else if (key === 'shift') { st.shiftOn = !st.shiftOn; settings.set('shift', st.shiftOn); }
         else if (key === 'waze') { sizeIx = (sizeIx + 1) % SIZES.length; waze.setSize(SIZES[sizeIx][1]).catch(() => {}); say('Waze map: ' + SIZES[sizeIx][0]); }
