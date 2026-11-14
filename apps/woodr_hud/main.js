@@ -11,7 +11,8 @@
  *        a press on a group opens its rows, and its Back row returns. An app's rows are its switches and
  *        choices (kit/hudlink.js; settings only, the app that owns one applies it). The car opens its own
  *        list with the same button whatever an app does, so the roller's press is left alone: it would
- *        pick in the car's list.
+ *        pick in the car's list. WITH THE WHEEL GATE on the car and its setting on, the car sees neither, and
+ *        the wheel works the natural way: the roller's press selects, the menu button goes back, then closes.
  * REVS   With the engine running: a row of segments that fills with the revs, white, then yellow, then red,
  *        and blinks from the shift rpm. It is redrawn only when the number of lit segments changes; the blink
  *        only toggles the layer's visibility, so no pixels go up for it. Setting "Shift display": the older
@@ -182,7 +183,7 @@ async function background(bg) {
             /* first press: the next menu-button press also goes to the car. That press lands here again: close ours. */
             if (Date.now() < st.gateOffUntil) { closeMenu(); log.info('menu: closed (the car\'s list)'); return; }
             st.gateOffUntil = Date.now() + 6000;
-            say('Press again for the car\'s list');
+            say(gateWanted() ? 'Press the menu button for the car\'s list' : 'Press again for the car\'s list');
         }
         else if (key === 'ambient') { const a = shared.read('ambient.json') || {}; shared.write('ambient.json', { cmd: 'next', n: (a.n || 0) + 1 }); say('Ambient: next colour'); }
     }
@@ -194,7 +195,8 @@ async function background(bg) {
         if (it.kind === 'group') { st.group = it.group; st.say = ''; log.info('menu: into ' + it.group); return; }
         if (it.kind === 'back') { st.group = null; st.say = ''; log.info('menu: back'); return; }
         if (it.kind === 'action') { pick(it.key); return; }
-        const to = hudlink.next(it);
+        /* a row calls its type `kind`; the link's next() wants `type` (without it a switch never flipped: 0.4.0 to 0.7.2) */
+        const to = hudlink.next({ type: it.kind, value: it.value, options: it.options });
         st.lastPick = (it.app ? it.app + ' ' : '') + it.key;
         log.info('menu: ' + st.lastPick + ' -> ' + to);
         if (it.app) {
@@ -216,6 +218,22 @@ async function background(bg) {
             st.touched = Date.now();
             /* always opens at the top level on its first row, Highlight: open and press is all a highlight takes */
             if (!st.menuOpen) { st.menuOpen = true; st.say = ''; st.group = null; st.sels = {}; showMenu(true); log.info('menu: open'); return; }
+            if (gateWanted()) {
+                /* with the wheel gate the roller's press selects, so this button only leaves: out of a group, then out
+                 * of the menu. While a press is being let through to the car (its own list was asked for), it closes ours. */
+                if (Date.now() < st.gateOffUntil || !st.group) { closeMenu(); log.info('menu: closed (button)'); return; }
+                st.group = null; st.say = ''; log.info('menu: back (button)');
+                showMenu(true);
+                return;
+            }
+            act(items()[st.at]);
+            if (st.menuOpen) showMenu(true);
+        },
+        /* The roller's press selects the chosen row, only with the wheel gate: without it the car's own list is open
+         * under our menu and the same press would pick in that. */
+        onPress: () => {
+            if (!st.menuOpen || !gateWanted()) return;
+            st.touched = Date.now();
             act(items()[st.at]);
             if (st.menuOpen) showMenu(true);
         },
@@ -389,9 +407,13 @@ mgu.run({
             const t = ctx.theme();
             const cv = ctx.canvas(W, H).clear(t.bg);
             G.panel(cv, t, 24, 44, 760, 468, 'HUD menu');
-            ['Press the menu button on the wheel (three lines, right side) to open the menu.',
-                'Roll the right roller to move. Press the menu button again to change the chosen row:',
-                'the menu stays open. Pick Close, or wait 10 s, to leave.', '', 'The first rows (tap one to change it here):']
+            (settings.get('menu') !== false && settings.get('gate') === true
+                ? ['Press the menu button on the wheel (three lines, right side) to open the menu.',
+                    'Roll the right roller to move and press the roller to select: the menu stays open.',
+                    'The menu button goes back a level, then closes. It also closes after 10 s.', '', 'The first rows (tap one to change it here):']
+                : ['Press the menu button on the wheel (three lines, right side) to open the menu.',
+                    'Roll the right roller to move. Press the menu button again to change the chosen row:',
+                    'the menu stays open. Pick Close, or wait 10 s, to leave.', '', 'The first rows (tap one to change it here):'])
                 .forEach((l, i) => cv.text(l, 48, 112 + i * 32, 20, i < 3 ? t.text : t.dim));
             bgm.items().slice(0, 5).forEach((it, i) => {
                 const y = 300 + i * 40;
