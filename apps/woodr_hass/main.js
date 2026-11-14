@@ -120,10 +120,33 @@ function drawQr(cv, text, x, y, size) {
 }
 
 /** The lock screen's mark: a W in a ring. */
+/**
+ * The BimmerApps mark, s = half its height: a squared B inside four corner brackets over a row of four
+ * segments, the last one in the accent colour. The same drawing as tools/make_brand_icons.js (a 140 px grid).
+ */
 function drawLogo(cv, t, cx, cy, s) {
-    cv.arc(cx, cy, s * 0.92, s, 0, 360,withAlpha(t.accent, 0.9));
-    const p = [[-0.52, -0.36], [-0.27, 0.40], [0, -0.16], [0.27, 0.40], [0.52, -0.36]].map((q) => [cx + q[0] * s, cy + q[1] * s]);
-    cv.polyline(p, Math.max(6, s * 0.11), t.text);
+    const k = s / 70, w = t.text;
+    const X = (x) => Math.round(cx + (x - 70) * k), Y = (y) => Math.round(cy + (y - 70) * k), L = (v) => Math.max(1, Math.round(v * k));
+    const box = (x, y, bw, bh, c) => cv.fillRect(X(x), Y(y), L(bw), L(bh), c || w);
+    /* a triangle as a four-point shape (the fourth point is half way along one edge): the screens' canvas has quad() only */
+    const tri = (pts) => { const q = pts.map((v) => [X(v[0]), Y(v[1])]); cv.quad([q[0], q[1], q[2], [(q[2][0] + q[0][0]) / 2, (q[2][1] + q[0][1]) / 2]], w); };
+    const ln = (xa, ya, xb, yb) => cv.line(X(xa), Y(ya), X(xb), Y(yb), L(4), w);
+    const b = 20, m = 8, e = 132;
+    ln(m, m, m + b, m); ln(m, m, m, m + b); ln(e, m, e - b, m); ln(e, m, e, m + b);
+    ln(m, e, m + b, e); ln(m, e, m, e - b); ln(e, e, e - b, e); ln(e, e, e, e - b);
+    for (let i = 0; i < 4; i++) box(37 + i * 17, 112, 13, 11, i === 3 ? '#ff1f3d' : w);
+    box(42, 26, 15, 76);
+    box(42, 26, 42, 14); box(42, 57, 42, 14); box(42, 88, 46, 14);
+    box(80, 36, 14, 18); box(84, 70, 14, 19);
+    tri([[84, 26], [94, 36], [84, 36]]); tri([[80, 54], [94, 54], [84, 62]]);
+    tri([[84, 61], [98, 70], [84, 70]]); tri([[88, 89], [98, 89], [88, 99]]);
+}
+
+/** Locked in a way a scan of the code on the screen clears: asked for by the house, or no phone seen in the car. */
+function wantsScan(session) {
+    if (!session || session.unlocked) return false;
+    const r = String(session.reason);
+    return r.indexOf('scan-required') === 0 || r === 'no-phone';
 }
 
 /**
@@ -195,8 +218,7 @@ async function background(bg) {
     /* ---------------- the relay ---------------- */
 
     relay.on('change', () => {
-        if (relay.state === 'paired' && relay.online && !relay.session.unlocked
-            && String(relay.session.reason).indexOf('scan-required') === 0) relay.scanCode();
+        if (relay.state === 'paired' && relay.online && wantsScan(relay.session)) relay.scanCode();
         tellGarage();
         /* a camera tile's picture is up: keep its caption on the tile's current line */
         if (doorbell.status().shown) relay.tiles.forEach((x) => { if (x.kind === 'camera' && x.info && doorbell.camera === (x.camera || x.id)) doorbell.setCaption(x.name + ': ' + x.info); });
@@ -221,8 +243,7 @@ async function background(bg) {
             if (settings.get('reload') === true) { settings.set('reload', false); relay.stop(); relay.start(); hooks.say('relay.json read again'); }
             if (settings.get('testBell') === true) { settings.set('testBell', false); doorbell.ring('Front door (test)', 'front_door'); }
             if (settings.get('doorbell') === 'off' && doorbell.status().shown) doorbell.dismiss('turned off');
-            if (relay.state === 'paired' && relay.online && relay.session && !relay.session.unlocked
-                && String(relay.session.reason).indexOf('scan-required') === 0) relay.scanCode();
+            if (relay.state === 'paired' && relay.online && wantsScan(relay.session)) relay.scanCode();
         } catch (e) { log.warn('tick: ' + e); }
     }, 1000);
     if (second.unref) second.unref();
@@ -317,8 +338,8 @@ mgu.run({
         }
 
         function drawLocked(cv, t, line) {
-            drawLogo(cv, t, W / 2, 250, 130);
-            if (line && settings.get('hints') !== false) cv.text(line, W / 2, 452, 22, t.dim, { align: 'center' });
+            drawLogo(cv, t, W / 2, 230, 120);
+            if (line && settings.get('hints') !== false) cv.text(line, W / 2, 410, 24, t.dim, { align: 'center' });
         }
 
         function drawTiles(cv, t) {
@@ -375,10 +396,13 @@ mgu.run({
             } else if (!relay.fresh()) {
                 drawLocked(cv, t, relay.lastOk ? 'No connection to the house' : 'Connecting...');
             } else if (!s.unlocked) {
-                if (String(s.reason).indexOf('scan-required') === 0 && relay.scan && Date.now() < relay.scan.until) {
-                    drawCode(cv, t, 'Locked', relay.scan.code, relay.scan.qr, relay.scan.until,
+                /* never a bare logo: say why it is locked and give the way in. Without the phone's CarPlay
+                 * automations the house sees no phone, and a scan of this code is what tells it one is here. */
+                const noPhone = String(s.reason) === 'no-phone';
+                if (wantsScan(s) && relay.scan && Date.now() < relay.scan.until) {
+                    drawCode(cv, t, noPhone ? 'Scan with your phone' : 'Locked', relay.scan.code, relay.scan.qr, relay.scan.until,
                         'Or in Home Assistant: Approve a car code, and type it in.');
-                } else drawLocked(cv, t, String(s.reason).indexOf('scan-required') === 0 ? 'Locked' : '');
+                } else drawLocked(cv, t, noPhone ? 'The house does not see your phone in the car yet' : 'Locked');
             } else {
                 cv.text('Home', 24, 80, 30, t.text, { font: 'bold' });
                 cv.text('Live', W - 24, 80, 24, GREEN, { align: 'right', font: 'bold' });
