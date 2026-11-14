@@ -52,11 +52,29 @@ function writeWhole(file, obj) {
     fs.renameSync(tmp, file);
 }
 
+/**
+ * A file another app wrote, or null. Opened once and judged by what was opened: not followed if it is a link,
+ * never waited on if it is a pipe, only a regular file, and at most MAX_FILE bytes are ever read, so a file
+ * swapped or grown between a check and a read gains nothing.
+ */
 function readJson(file) {
+    let fd = -1;
     try {
-        if (fs.statSync(file).size > MAX_FILE) return null;
-        return JSON.parse(fs.readFileSync(file, 'utf8'));
+        const C = fs.constants || {};
+        fd = fs.openSync(file, (C.O_RDONLY || 0) | (C.O_NOFOLLOW || 0) | (C.O_NONBLOCK || 0));
+        const st = fs.fstatSync(fd);
+        if (!st.isFile() || st.size > MAX_FILE) return null;
+        const buf = Buffer.alloc(MAX_FILE + 1);
+        let n = 0;
+        for (;;) {
+            const got = fs.readSync(fd, buf, n, buf.length - n, null);
+            if (got <= 0) break;
+            n += got;
+            if (n > MAX_FILE) return null;
+        }
+        return JSON.parse(buf.toString('utf8', 0, n));
     } catch (e) { return null; }
+    finally { if (fd >= 0) { try { fs.closeSync(fd); } catch (e) { /* closed */ } } }
 }
 
 const cut = (v, n) => String(v === undefined || v === null ? '' : v).slice(0, n);

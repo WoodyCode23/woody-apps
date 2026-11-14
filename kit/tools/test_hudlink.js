@@ -103,6 +103,16 @@ const SCHEMA = [
         && evil.items[1].options.length === 12 && evil.items[1].options[0][1].length === 32 && evil.items[1].value === null && !evil.items.some((i) => i.key.length > 64 || i.key === 'c'));
     fs.writeFileSync(path.join(hud.DIR, 'huge.json'), JSON.stringify({ id: 'huge', at: Date.now(), items: [{ key: 'a', label: big, type: 'bool', value: true }] }));
     ok('a file over the size limit is not read', !hud.apps().some((a) => a.id === 'huge'));
+    /* a link in place of an app's file is not followed (where the system has such links and lets us make one) */
+    let linked = false;
+    try {
+        fs.writeFileSync(path.join(tmp, 'outside.json'), JSON.stringify({ id: 'linky', at: Date.now(), items: [{ key: 'a', label: 'a', type: 'bool', value: true }] }));
+        fs.symlinkSync(path.join(tmp, 'outside.json'), path.join(hud.DIR, 'linky.json'));
+        linked = true;
+    } catch (e) { /* no links here (Windows without the right): nothing to test */ }
+    if (linked && fs.constants && fs.constants.O_NOFOLLOW) ok('a link in place of an app\'s file is not followed', !hud.apps().some((a) => a.id === 'linky'));
+    else console.log('skip a link in place of an app\'s file (this system cannot make or refuse one)');
+    ok('a folder in place of an app\'s file is skipped', (() => { fs.mkdirSync(path.join(hud.DIR, 'dir.json')); return !hud.apps().some((a) => a.id === 'dir'); })());
     console.log(failed ? 'FAILED: ' + failed : 'all ok');
     process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });
