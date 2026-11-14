@@ -1,8 +1,8 @@
 {
   "id": "woodr_hud",
   "title": "HUD",
-  "description": "A menu on the head-up display worked from the steering wheel, a rev bar across the top of the display that changes colour and blinks at the shift point, and the song CarPlay is playing as one line above it. Read-only: signals in, pixels out.",
-  "version": "0.3.5",
+  "description": "A menu on the head-up display worked from the steering wheel: every app's switches and choices in one roller, and a press changes one while the menu stays open. A rev bar across the top of the display that changes colour and blinks at the shift point, and the song CarPlay is playing with its time left. Read-only: signals in, pixels out.",
+  "version": "0.4.0",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",
@@ -21,9 +21,11 @@
       "statusRotaryPress": "rs"
     },
     "de.bmw.infotainment.entertainment.mediaplayer.MediaPlayer": {
-      "_optional": "the song CarPlay is playing, for the song line",
+      "_optional": "the song CarPlay is playing, its times and whether it plays, for the song line",
       "_instances": "CarPlayMedia",
-      "currentItemMetadata": "rs"
+      "currentItemMetadata": "rs",
+      "currentItemTime": "rs",
+      "playerState": "rs"
     }
   },
   "screens": [
@@ -55,7 +57,8 @@
       "key": "shift",
       "label": "Show the revs on the head-up display",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hudLabel": "Rev bar"
     },
     {
       "key": "style",
@@ -71,7 +74,8 @@
           "Frame round the map"
         ]
       ],
-      "default": "bar"
+      "default": "bar",
+      "hudLabel": "Shift display"
     },
     {
       "key": "place",
@@ -87,30 +91,15 @@
           "Lower, clear of the car's own readouts"
         ]
       ],
-      "default": "top"
+      "default": "top",
+      "hudLabel": "Position"
     },
     {
       "key": "song",
       "label": "Show the song line",
       "type": "bool",
-      "default": true
-    },
-    {
-      "key": "confirm",
-      "label": "Confirm a menu pick with",
-      "type": "choice",
-      "options": [
-        [
-          "menu",
-          "The menu button again"
-        ],
-        [
-          "roller",
-          "The roller's press"
-        ]
-      ],
-      "default": "menu",
-      "hud": false
+      "default": true,
+      "hudLabel": "Song"
     },
     {
       "key": "greenRpm",

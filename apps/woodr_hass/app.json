@@ -3,7 +3,7 @@
   "title": "Home Assistant",
   "description": "Your house on the centre screen through Car Relay: garage doors, the front door lock and the doorbell camera on the instrument cluster. Pairs with a QR code, shows only while your phone is in the car, and holds no Home Assistant token",
   "autostart": true,
-  "version": "0.6.2",
+  "version": "0.6.3",
   "vendor": "custom",
   "loggingId": "OAA8",
   "iconGlyph": "live_data",
@@ -102,7 +102,8 @@
           "always",
           "Always (not recommended)"
         ]
-      ]
+      ],
+      "hudLabel": "Doorbell"
     },
     {
       "key": "doorbellSecs",
@@ -123,7 +124,8 @@
       "key": "doorbellLive",
       "label": "Doorbell: live video when the house can send it (off = one picture a second)",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hudLabel": "Live video"
     },
     {
       "key": "doorbellScreen",
@@ -143,7 +145,8 @@
           "both",
           "Both"
         ]
-      ]
+      ],
+      "hudLabel": "Camera shows on"
     },
     {
       "key": "contend",

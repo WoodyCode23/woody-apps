@@ -2,7 +2,7 @@
   "id": "woodr_warmhud",
   "title": "Warm-Up HUD",
   "description": "Warm-up on the head-up display: oil, then the gearbox, then the tyres, then it turns itself off. Warns of a low tyre any time.",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "vendor": "custom",
   "loggingId": "OAA6",
   "iconGlyph": "warmup",
@@ -69,19 +69,22 @@
       "key": "hud",
       "label": "Show on head-up display",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hudLabel": "Show on HUD"
     },
     {
       "key": "taps",
       "label": "Double-tap the high-beam-assistant button to hide / show (when HUD is not installed)",
       "type": "bool",
-      "default": false
+      "default": false,
+      "hudLabel": "Double-tap hides"
     },
     {
       "key": "engineOnly",
       "label": "Only with the engine running",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hudLabel": "Engine on only"
     },
     {
       "key": "readyAt",
@@ -101,7 +104,8 @@
       "key": "trans",
       "label": "Gearbox warm-up after oil",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hudLabel": "Gearbox warm-up"
     },
     {
       "key": "transReady",
@@ -125,7 +129,8 @@
       "key": "tyres",
       "label": "Tyre warm-up after the gearbox",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hudLabel": "Tyre warm-up"
     },
     {
       "key": "tyreReady",
@@ -168,7 +173,8 @@
           "0.3",
           "0.3 bar / 4 psi"
         ]
-      ]
+      ],
+      "hudLabel": "Low tyre warning"
     },
     {
       "key": "pressureUnit",
@@ -216,7 +222,8 @@
           "60",
           "60 s after ready"
         ]
-      ]
+      ],
+      "hudLabel": "Off once warm"
     },
     {
       "key": "tempUnit",
