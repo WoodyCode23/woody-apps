@@ -26,4 +26,6 @@ apps/woodr_launch
 apps/woodr_valet
 apps/woodr_report
 apps/woodr_guard
+apps/woodr_audiolab
+apps/woodr_studio
 components/
