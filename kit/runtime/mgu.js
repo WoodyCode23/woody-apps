@@ -539,6 +539,9 @@ async function runInner(impl) {
     await app.start();
     active();
     const settings = new Settings(SPEC.settings);
+    // every app's switches and choices are offered to the head-up display's menu (hudlink.js); app.json
+    // "hud": false keeps an app, or one setting, out of it
+    try { require('./hudlink').serve(SPEC, settings, log); } catch (e) { log.warn('hudlink: ' + e); }
     // impl.background(bg): what the app does with or without its screens (app.json "autostart": true, an app the
     // platform starts by itself); bg = { app, log, settings, signals, spec, dataDir }. What it returns is
     // ctx.background for impl.start.

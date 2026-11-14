@@ -59,7 +59,8 @@
       "key": "pushCar",
       "label": "Send car state to Home Assistant",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hud": false
     },
     {
       "key": "pushEvery",
@@ -148,25 +149,29 @@
       "key": "contend",
       "label": "Take the cluster slot from BMW",
       "type": "bool",
-      "default": false
+      "default": false,
+      "hud": false
     },
     {
       "key": "hints",
       "label": "Show a line of text on the lock screen",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hud": false
     },
     {
       "key": "testBell",
       "label": "Test the doorbell now",
       "type": "bool",
-      "default": false
+      "default": false,
+      "hud": false
     },
     {
       "key": "reload",
       "label": "Read relay.json again",
       "type": "bool",
-      "default": false
+      "default": false,
+      "hud": false
     }
   ]
 }

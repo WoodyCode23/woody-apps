@@ -48,7 +48,8 @@
       "key": "menu",
       "label": "The wheel's menu button opens the HUD menu",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hud": false
     },
     {
       "key": "shift",
@@ -108,7 +109,8 @@
           "The roller's press"
         ]
       ],
-      "default": "menu"
+      "default": "menu",
+      "hud": false
     },
     {
       "key": "greenRpm",

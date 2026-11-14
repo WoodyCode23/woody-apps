@@ -47,7 +47,8 @@
       "key": "showTools",
       "label": "Show tools as well as apps",
       "type": "bool",
-      "default": true
+      "default": true,
+      "hud": false
     }
   ]
 }

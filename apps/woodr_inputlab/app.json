@@ -3,10 +3,13 @@
   "title": "Input Lab",
   "description": "Shows which steering-wheel, stalk, console and gesture inputs the head unit sees, live, so apps can use them. Listens only: nothing is sent to the car.",
   "version": "0.1.3",
+  "hud": false,
   "vendor": "custom",
   "loggingId": "OAAB",
   "iconGlyph": "live_data",
-  "mguHmi": ["ID7"],
+  "mguHmi": [
+    "ID7"
+  ],
   "signals": {
     "de.bmw.infotainment.controlelements.SteeringWheelPushButton": {
       "_optional": "the steering-wheel buttons",
@@ -46,13 +49,17 @@
       "_optional": "the mode / My Car buttons",
       "operationModeButtons": "s",
       "operationMyCarButton": "s",
-      "_broadcasts": ["displayDassComfortSettingsMenu"]
+      "_broadcasts": [
+        "displayDassComfortSettingsMenu"
+      ]
     },
     "de.bmw.infotainment.controllerelements.gesture.GestureRecognition": {
       "_optional": "gesture control",
       "activations": "rs",
       "cameraStatus": "rs",
-      "_broadcasts": ["gestures"]
+      "_broadcasts": [
+        "gestures"
+      ]
     }
   },
   "screens": [
@@ -61,12 +68,23 @@
       "kind": "canvas",
       "title": "Input Lab",
       "buttons": [
-        ["BTN_ACTION", "Clear"],
-        ["BTN_SETTINGS", "Settings"]
+        [
+          "BTN_ACTION",
+          "Clear"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
       ]
     }
   ],
   "settings": [
-    {"key": "showRotary", "label": "Show controller and roller turns", "type": "bool", "default": true}
+    {
+      "key": "showRotary",
+      "label": "Show controller and roller turns",
+      "type": "bool",
+      "default": true
+    }
   ]
 }

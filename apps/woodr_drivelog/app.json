@@ -75,7 +75,8 @@
           "auto",
           "Until the car answers"
         ]
-      ]
+      ],
+      "hud": false
     }
   ]
 }

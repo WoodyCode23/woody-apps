@@ -3,6 +3,7 @@
   "title": "Dev HUD",
   "description": "Progress bars on the head-up display while you work on the car: Store installs, the battery's charge, the network, and any bar pushed from the laptop. Hidden while driving. Read-only.",
   "version": "0.1.4",
+  "hud": false,
   "vendor": "custom",
   "loggingId": "OAAC",
   "iconGlyph": "live_data",
