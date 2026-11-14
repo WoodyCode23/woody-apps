@@ -31,6 +31,8 @@ const { Waze } = require('./waze');
 const { Song } = require('./song');
 const { drawBar, drawSong, drawCard, CARD, PLACES, SEGS, RPM_FULL, WHITE, ACCENT } = require('./strip');
 const shared = require('./shared');
+const fs = require('fs');
+const path = require('path');
 const hudlink = require('./kit/hudlink');
 const menu = require('./menu');
 
@@ -58,7 +60,7 @@ async function background(bg) {
     const { log, settings } = bg;
     const car = new Car(bg, ['rpm']);
     const waze = new Waze(log);
-    const st = { menuOpen: false, at: 0, group: null, sels: {}, say: '', sayUntil: 0, pending: null, openedAt: 0, warmup: 'auto', shiftOn: settings.get('shift') !== false, stage: '', box: null, lastPick: '' };
+    const st = { menuOpen: false, at: 0, group: null, sels: {}, gateOffUntil: 0, say: '', sayUntil: 0, pending: null, openedAt: 0, warmup: 'auto', shiftOn: settings.get('shift') !== false, stage: '', box: null, lastPick: '' };
     const cr = ClusterRender ? new ClusterRender(APP_ID) : null;
     if (cr) {
         cr.on('layer', (ref, s, why) => log.info('hud layer ' + ref + ': ' + s + (why ? ' (' + why + ')' : '')));
@@ -86,6 +88,8 @@ async function background(bg) {
         list.push({ g: 'Quick actions', app: null, key: 'waze', kind: 'action', label: 'Waze map', value: SIZES[sizeAt()][0] });
         list.push({ g: 'Quick actions', app: null, key: 'ambient', kind: 'action', label: 'Ambient colour', value: 'Next' });
         list.push({ g: 'Quick actions', app: null, key: 'test', kind: 'action', label: 'Test the rev bar', value: 'Run' });
+        /* with the wheel gate the menu button no longer opens the car's own list: this row lets one press through */
+        if (gateWanted()) list.push({ g: 'Quick actions', app: null, key: 'carlist', kind: 'action', label: 'Car\'s audio list', value: 'Open' });
         try { hudlink.apps(APP_ID).forEach((a) => a.items.forEach(row(a.title, a.id))); } catch (e) { log.warn('menu: apps: ' + e); }
         /* a change asked of another app shows at once, until that app has had time to answer with its own value */
         const p = st.pending;
@@ -173,6 +177,12 @@ async function background(bg) {
         else if (key === 'shift') { st.shiftOn = !st.shiftOn; settings.set('shift', st.shiftOn); }
         else if (key === 'waze') { sizeIx = (sizeIx + 1) % SIZES.length; waze.setSize(SIZES[sizeIx][1]).catch(() => {}); say('Waze map: ' + SIZES[sizeIx][0]); }
         else if (key === 'test') { st.testUntil = Date.now() + 6500; say('Rev bar test running'); }
+        else if (key === 'carlist') {
+            /* first press: the next menu-button press also goes to the car. That press lands here again: close ours. */
+            if (Date.now() < st.gateOffUntil) { closeMenu(); log.info('menu: closed (the car\'s list)'); return; }
+            st.gateOffUntil = Date.now() + 6000;
+            say('Press again for the car\'s list');
+        }
         else if (key === 'ambient') { const a = shared.read('ambient.json') || {}; shared.write('ambient.json', { cmd: 'next', n: (a.n || 0) + 1 }); say('Ambient: next colour'); }
     }
 
@@ -219,6 +229,33 @@ async function background(bg) {
         },
     });
     await wheel.start();
+    /* ---------- the wheel gate ----------
+     * With the BimmerApps build of mgu-inputgate.so loaded in the car's interface program, the car does not see
+     * the wheel's menu button while wheelgate.menu is fresh, nor the roller while wheelgate.roll is fresh, so its
+     * own list neither opens nor is scrolled or picked in under our menu. The files are touched here a few
+     * times a second: the menu button whenever this menu is switched on, the roller only while it is open. Not
+     * touched (this app stopped, or the switch off): the car has its buttons back within 0.7 s. Without that
+     * build on the car the files do nothing at all. */
+    /* a declaration, not a const: the menu's rows ask it and may be built before this line has run */
+    function gateWanted() { return settings.get('menu') !== false && settings.get('gate') === true; }
+    let gateWarned = false;
+    function touchGate(name) {
+        const file = path.join(shared.DIR, name), now = new Date();
+        try { fs.utimesSync(file, now, now); }
+        catch (e) {
+            try { if (e.code !== 'ENOENT') throw e; shared.write('hud.json', { warmup: st.warmup }); fs.writeFileSync(file, '', { mode: 0o644 }); }
+            catch (e2) { if (!gateWarned) { gateWarned = true; log.warn('wheel gate: ' + name + ': ' + (e2.code || e2)); } }
+        }
+    }
+    const gateTimer = setInterval(() => {
+        try {
+            if (!gateWanted() || Date.now() < st.gateOffUntil) return;
+            touchGate('wheelgate.menu');
+            if (st.menuOpen) touchGate('wheelgate.roll');
+        } catch (e) { log.warn('wheel gate: ' + e); }
+    }, 200);
+    if (gateTimer.unref) gateTimer.unref();
+
     const menuTimer = setInterval(() => {
         try {
             if (!st.menuOpen) return;
@@ -338,7 +375,7 @@ async function background(bg) {
     const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 15000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
-    process.on('exit', () => { [menuTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); hideBar(); hideSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
+    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); hideBar(); hideSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
     return { st: st, items: items, waze: waze, pick: pick, act: act, song: song };
 }
 

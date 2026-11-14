@@ -2,7 +2,7 @@
   "id": "woodr_hud",
   "title": "HUD",
   "description": "A menu on the head-up display worked from the steering wheel: every app's switches and choices in one roller, and a press changes one while the menu stays open. A rev bar across the top of the display that changes colour and blinks at the shift point, and the song CarPlay is playing with its time left. Read-only: signals in, pixels out.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",
@@ -51,6 +51,13 @@
       "label": "The wheel's menu button opens the HUD menu",
       "type": "bool",
       "default": true,
+      "hud": false
+    },
+    {
+      "key": "gate",
+      "label": "Keep the wheel's menu button and roller for the HUD menu (only with the wheel gate installed on the car)",
+      "type": "bool",
+      "default": false,
       "hud": false
     },
     {
