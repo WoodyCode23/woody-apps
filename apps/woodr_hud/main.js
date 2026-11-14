@@ -16,7 +16,9 @@
  *        and blinks from the shift rpm. It is redrawn only when the number of lit segments changes; the blink
  *        only toggles the layer's visibility, so no pixels go up for it. Setting "Shift display": the older
  *        coloured frame round the Waze map is still there as a choice.
- * SONG   The title and artist from CarPlay (song.js), on the top line. No CarPlay, no line.
+ * SONG   What CarPlay is playing (song.js) as a card at the bottom right, opposite the car's speed: the album
+ *        cover, the title over the artist, the time left and a line that fills as it plays. Setting "Song
+ *        look": the older single line at the top. No CarPlay, nothing shown.
  *
  * Read-only on the car: signals in, pixels out, two small files in /dev/shm/woody for the other Woody apps.
  */
@@ -27,7 +29,7 @@ const { Canvas, withAlpha } = require('./kit/canvas');
 const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
 const { Song } = require('./song');
-const { drawBar, drawSong, PLACES, SEGS, RPM_FULL, WHITE, ACCENT } = require('./strip');
+const { drawBar, drawSong, drawCard, CARD, PLACES, SEGS, RPM_FULL, WHITE, ACCENT } = require('./strip');
 const shared = require('./shared');
 const hudlink = require('./kit/hudlink');
 const menu = require('./menu');
@@ -284,7 +286,10 @@ async function background(bg) {
         const now = settings.get('song') !== false ? song.now : null;
         if (!now) { hideSong(); return; }
         const p = song.progress();
-        const g = place().song, key = JSON.stringify(g) + now.title + '|' + now.artist + '|' + (p ? Math.ceil(p.left) : '');
+        /* as a card at the bottom right (the default), or the older single line at the top */
+        const card = settings.get('songLook') !== 'line';
+        const g = card ? CARD : place().song;
+        const key = JSON.stringify(g) + now.title + '|' + now.artist + '|' + (p ? Math.ceil(p.left) : '') + '|' + (card ? song.coverId : '');
         if (key === songKey && songLayer) return;
         const geom = JSON.stringify(g);
         if (songLayer && geom !== songGeom) hideSong();      /* moved: a new layer; otherwise the same one is drawn on again */
@@ -294,7 +299,7 @@ async function background(bg) {
             songGeom = geom;
         }
         const cv = new Canvas(g.w, g.h);
-        drawSong(cv, g.w, g.h, { title: now.title, artist: now.artist, left: p ? p.left : null, frac: p ? p.frac : null });
+        (card ? drawCard : drawSong)(cv, g.w, g.h, { title: now.title, artist: now.artist, left: p ? p.left : null, frac: p ? p.frac : null, cover: song.cover });
         cr.pixels(songLayer, null, Buffer.from(cv.d.buffer || cv.d));
         songKey = key;
     }

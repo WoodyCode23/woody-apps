@@ -58,6 +58,28 @@ const LIST = [
     fs.writeFileSync(file, hud.png(6));
     console.log(file);
 });
+/* the song card at the bottom right, with a made-up cover, without one, and with a long title */
+(() => {
+    const n = strip.COVER, d = Buffer.alloc(n * n * 4);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const o = (y * n + x) * 4; d[o] = 40 + x * 4; d[o + 1] = 60 + y * 3; d[o + 2] = 200 - x * 2; d[o + 3] = 255; }
+    [[{ title: 'Sample Song Title', artist: 'Sample Artist', left: 171, frac: 0.3, cover: { d: d } }, 'card-cover'],
+        [{ title: 'Sample Song Title', artist: 'Sample Artist', left: 12, frac: 0.95, cover: null }, 'card-plain'],
+        [{ title: 'A Very Long Sample Song Title That Keeps Going', artist: 'An Artist With A Very Long Name Indeed', left: 3599, frac: 0.02, cover: { d: d } }, 'card-long']].forEach((v) => {
+        const hud = new Canvas(800, 480).clear('#101014');
+        hud.fillRect(120, 100, 570, 278, '#000000');
+        hud.strokeRoundRect(120, 100, 570, 278, 0, 1, '#444450');
+        const g = strip.PLACES.top;
+        const bar = new Canvas(g.bar.w, g.bar.h).clear('#000000');
+        strip.drawBar(bar, g.bar.w, g.bar.h, 13, () => '#e6e6ea');
+        paste(hud, bar, g.bar.x, g.bar.y);
+        const c = new Canvas(strip.CARD.w, strip.CARD.h).clear('#000000');
+        strip.drawCard(c, strip.CARD.w, strip.CARD.h, v[0]);
+        paste(hud, c, strip.CARD.x, strip.CARD.y);
+        const file = path.join(out, v[1] + '.png');
+        fs.writeFileSync(file, hud.png(6));
+        console.log(file);
+    });
+})();
 /* the top level: Highlight, one row per group, Close; and inside one group, with its Back row */
 (() => {
     const groups = [];
