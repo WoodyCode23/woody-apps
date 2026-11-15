@@ -14,7 +14,7 @@
  *        pick in the car's list. WITH THE WHEEL GATE on the car and its setting on, the car sees neither, and
  *        the wheel works the natural way: the roller's press selects, the menu button goes back, then closes.
  * REVS   With the engine running: a row of segments that fills with the revs, white, then yellow, then red,
- *        and blinks from the shift rpm. It is redrawn only when the number of lit segments changes; the blink
+ *        and blinks from the shift rpm, with the numbers 1 to 7 over it. It is redrawn only when its filled length changes; the blink
  *        only toggles the layer's visibility, so no pixels go up for it. Setting "Shift display": the older
  *        coloured frame round the Waze map is still there as a choice.
  * SONG   What CarPlay is playing (song.js) as a card at the bottom right, opposite the car's speed: the album
@@ -30,7 +30,7 @@ const { Canvas, withAlpha } = require('./kit/canvas');
 const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
 const { Song } = require('./song');
-const { drawBar, drawSong, drawCard, CARD, PLACES, SEGS, RPM_FULL, WHITE, ACCENT } = require('./strip');
+const { drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
 const shared = require('./shared');
 const fs = require('fs');
 const path = require('path');
@@ -313,24 +313,21 @@ async function background(bg) {
 
     /* ---------- rev bar and song line ---------- */
     const place = () => PLACES[settings.get('place') === 'slot' ? 'slot' : 'top'];
-    function colourAt(rpm) {
-        const y = Number(settings.get('yellowRpm')) || 5500, r = Number(settings.get('redRpm')) || 6300;
-        return rpm >= r ? ACCENT : rpm >= y ? COLOURS.yellow : WHITE;
-    }
     function hideBar() { if (barLayer && cr) { cr.drop(barLayer); } barLayer = 0; barKey = ''; barGeom = ''; barVisible = false; }
     function showBar(rpm, blink) {
-        const g = place().bar, geom = JSON.stringify(g);
+        /* the band with its numbers; where the song is shown as a line in the row above it, the band alone */
+        const p = place(), g = p.barSlim && settings.get('song') !== false && settings.get('songLook') === 'line' ? p.barSlim : p.bar, geom = JSON.stringify(g);
         if (geom !== barGeom) { hideBar(); barGeom = geom; }
         if (!barLayer) {
             barLayer = cr.image({ target: 'hud', klass: 'overlay', z: 7, x: g.x, y: g.y, w: g.w, h: g.h, iw: g.w, ih: g.h, fps: 8, sampling: 'nearest' });
             if (!barLayer) { log.warn('rev bar layer refused'); barGeom = ''; return; }
             barVisible = true;
         }
-        const filled = Math.max(0, Math.min(SEGS, Math.round(rpm / RPM_FULL * SEGS)));
+        const filled = barFill(g.w, g.h, rpm);
         const key = filled + '|' + (settings.get('yellowRpm') || '') + '|' + (settings.get('redRpm') || '');
         if (key !== barKey) {
             const cv = new Canvas(g.w, g.h);
-            drawBar(cv, g.w, g.h, filled, colourAt);
+            drawBar(cv, g.w, g.h, filled, { yellow: settings.get('yellowRpm'), red: settings.get('redRpm') });
             cr.pixels(barLayer, null, Buffer.from(cv.d.buffer || cv.d));
             barKey = key;
         }

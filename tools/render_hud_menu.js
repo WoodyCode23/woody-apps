@@ -49,7 +49,7 @@ const LIST = [
     strip.drawSong(song, g.song.w, g.song.h, { title: 'Sample Song Title', artist: 'Sample Artist', left: 171, frac: 0.3 });
     paste(hud, song, g.song.x, g.song.y);
     const bar = new Canvas(g.bar.w, g.bar.h).clear('#000000');
-    strip.drawBar(bar, g.bar.w, g.bar.h, 13, () => '#e6e6ea');
+    strip.drawBar(bar, g.bar.w, g.bar.h, strip.barFill(g.bar.w, g.bar.h, 3100), { yellow: 5500, red: 6300 });
     paste(hud, bar, g.bar.x, g.bar.y);
     const m = new Canvas(menu.MENU.w, menu.MENU.h);
     menu.draw(m, LIST, v[0], v[1], v[2]);
@@ -70,7 +70,7 @@ const LIST = [
         hud.strokeRoundRect(120, 100, 570, 278, 0, 1, '#444450');
         const g = strip.PLACES.top;
         const bar = new Canvas(g.bar.w, g.bar.h).clear('#000000');
-        strip.drawBar(bar, g.bar.w, g.bar.h, 13, () => '#e6e6ea');
+        strip.drawBar(bar, g.bar.w, g.bar.h, strip.barFill(g.bar.w, g.bar.h, 3100), { yellow: 5500, red: 6300 });
         paste(hud, bar, g.bar.x, g.bar.y);
         const c = new Canvas(strip.CARD.w, strip.CARD.h).clear('#000000');
         strip.drawCard(c, strip.CARD.w, strip.CARD.h, v[0]);

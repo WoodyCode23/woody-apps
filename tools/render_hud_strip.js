@@ -16,7 +16,6 @@ const api = require(path.join(__dirname, '..', 'apps', 'woodr_hud', 'strip'));
 
 const out = path.resolve(process.argv[2] || 'out-hud');
 fs.mkdirSync(out, { recursive: true });
-const colourAt = (rpm) => (rpm >= 6300 ? '#ff1f3d' : rpm >= 5500 ? '#ffd34d' : '#e6e6ea');
 const paste = (dst, srcCv, x, y) => {
     for (let r = 0; r < srcCv.h; r++) for (let c = 0; c < srcCv.w; c++) {
         const i = (r * srcCv.w + c) * 4, j = ((y + r) * dst.w + (x + c)) * 4;
@@ -24,17 +23,17 @@ const paste = (dst, srcCv, x, y) => {
     }
 };
 
-[['top', 3200, 'idle-ish'], ['top', 5800, 'yellow'], ['top', 6900, 'red'], ['slot', 5800, 'slot']].forEach((v) => {
-    const g = api.PLACES[v[0]];
+[['top', 850, 'idle', 1], ['top', 3200, 'idle-ish'], ['top', 5800, 'yellow'], ['top', 6900, 'red'], ['top', 4400, 'with-song-line', 0, 1], ['slot', 5800, 'slot']].forEach((v) => {
+    const g = api.PLACES[v[0]], gb = v[4] ? g.barSlim : g.bar;
     const hud = new Canvas(800, 480).clear('#101014');
     hud.fillRect(120, 100, 570, 278, '#000000');                     /* the visible window */
     hud.strokeRoundRect(120, 100, 570, 278, 0, 1, '#444450');
     const song = new Canvas(g.song.w, g.song.h).clear('#000000');
     api.drawSong(song, g.song.w, g.song.h, { title: 'Sample Song Title That Is Fairly Long', artist: 'Sample Artist' });
-    paste(hud, song, g.song.x, g.song.y);
-    const bar = new Canvas(g.bar.w, g.bar.h).clear('#000000');
-    api.drawBar(bar, g.bar.w, g.bar.h, Math.round(v[1] / api.RPM_FULL * api.SEGS), colourAt);
-    paste(hud, bar, g.bar.x, g.bar.y);
+    if (v[4] || v[0] === 'slot') paste(hud, song, g.song.x, g.song.y);
+    const bar = new Canvas(gb.w, gb.h).clear('#000000');
+    api.drawBar(bar, gb.w, gb.h, api.barFill(gb.w, gb.h, v[1]), { yellow: 5500, red: 6300 });
+    paste(hud, bar, gb.x, gb.y);
     const file = path.join(out, 'hud-' + v[2] + '.png');
     fs.writeFileSync(file, hud.png(6));
     console.log(file);

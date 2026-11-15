@@ -4,21 +4,49 @@
  * Kept apart from main.js so tools/render_hud_strip.js can draw the same pictures on a PC.
  */
 const SLOT = { x: 220, y: 185, w: 470, h: 133 };            /* clear of the car's own HUD content in every view (Screen Lab) */
-const SEGS = 30, RPM_FULL = 7200, SEG_GAP = 3;
+const RPM_FULL = 7200;
 const WHITE = '#e6e6ea', OFF = '#2a2a31', ACCENT = '#ff1f3d';
 /* where the song line and the rev bar sit: the very top of the HUD's visible window (as in the simulator), or
  * inside the slot that stays clear of the car's own content in every HUD view */
 const PLACES = {
-    top: { song: { x: 128, y: 100, w: 554, h: 22 }, bar: { x: 132, y: 126, w: 546, h: 14 } },
-    slot: { song: { x: SLOT.x, y: SLOT.y, w: SLOT.w, h: 22 }, bar: { x: SLOT.x + 4, y: SLOT.y + 26, w: SLOT.w - 8, h: 14 } },
+    /* bar: the band with its numbers. barSlim: the band alone, where the song line needs the row above it */
+    top: { song: { x: 128, y: 100, w: 554, h: 22 }, bar: { x: 132, y: 112, w: 546, h: 30 }, barSlim: { x: 132, y: 126, w: 546, h: 14 } },
+    slot: { song: { x: SLOT.x, y: SLOT.y, w: SLOT.w, h: 22 }, bar: { x: SLOT.x + 4, y: SLOT.y + 26, w: SLOT.w - 8, h: 30 } },
 };
 
-/** the rev bar: `filled` of SEGS segments lit, each in the colour its own rpm calls for */
-function drawBar(cv, w, h, filled, colourAt) {
-    const sw = (w - SEG_GAP * (SEGS - 1)) / SEGS;
-    for (let i = 0; i < SEGS; i++) {
-        const x = Math.round(i * (sw + SEG_GAP));
-        cv.fillRect(x, 0, Math.max(2, Math.round(sw)), h, i < filled ? colourAt((i + 1) / SEGS * RPM_FULL) : OFF);
+/* The rev bar is one band leaning to the right, cut by a thin gap at every 1000 rpm, with the numbers 1 to 7
+ * over the gaps when the layer is tall enough for them. */
+const LEAN = 0.5, STEP = 3, NUM = 12, YELLOW = '#ffd34d', RED_TRACK = '#4a1220', NUM_DIM = '#8d8e96';
+function band(w, h) {
+    const tall = h >= 28, y0 = tall ? NUM + 5 : 2, y1 = h - 1, lean = Math.round((y1 - y0) * LEAN);
+    return { tall: tall, y0: y0, y1: y1, lean: lean, span: w - lean - 1 };
+}
+
+/** how far the band is filled at `rpm`, in pixels, in steps of STEP so that it is drawn again no more often than it has to be */
+function barFill(w, h, rpm) {
+    const f = Number(rpm) / RPM_FULL, b = band(w, h);
+    return Math.round((f > 0 ? (f < 1 ? f : 1) : 0) * b.span / STEP) * STEP;
+}
+
+/** the rev bar filled to `fill` pixels (see barFill): white, then yellow from zones.yellow rpm, then red from zones.red */
+function drawBar(cv, w, h, fill, zones) {
+    const b = band(w, h), xOf = (rpm) => rpm / RPM_FULL * b.span;
+    const yellow = Math.min(RPM_FULL, Math.max(0, Number(zones && zones.yellow) || 5500)), red = Math.min(RPM_FULL, Math.max(yellow, Number(zones && zones.red) || 6300));
+    const slab = (xa, xb, c) => { if (xb > xa) cv.quad([[xa + b.lean, b.y0], [xb + b.lean, b.y0], [xb, b.y1], [xa, b.y1]], c); };
+    fill = Math.max(0, Math.min(b.span, fill));
+    slab(0, xOf(red), OFF);
+    slab(xOf(red), b.span, RED_TRACK);
+    [[0, yellow, WHITE], [yellow, red, YELLOW], [red, RPM_FULL, ACCENT]].forEach((z) => slab(xOf(z[0]), Math.min(fill, xOf(z[1])), z[2]));
+    /* depth: the lower part of the band a little darker, and a bright leading edge */
+    const ym = b.y0 + (b.y1 - b.y0) * 0.55, lm = Math.round((b.y1 - ym) * LEAN);
+    if (fill > 0) cv.quad([[lm, ym], [fill + lm, ym], [fill, b.y1], [0, b.y1]], [0, 0, 0, 64]);
+    if (fill > 4) slab(fill - 3, fill, '#ffffff');
+    const shown = fill / b.span * RPM_FULL;
+    for (let n = 1; n * 500 < RPM_FULL; n++) {
+        const rpm = n * 500, x = xOf(rpm);
+        if (n % 2) { if (b.tall) cv.fillRect(Math.round(x + b.lean), b.y0 - 4, 1, 3, rpm >= red ? ACCENT : NUM_DIM); continue; }
+        slab(x - 1, x + 1, '#000000');
+        if (b.tall) cv.text(String(n / 2), x + b.lean + 1, NUM, NUM, rpm >= red ? ACCENT : rpm <= shown ? '#ffffff' : NUM_DIM, { font: 'bold', align: 'center', literal: true });
     }
 }
 
@@ -101,4 +129,4 @@ function drawCard(cv, w, h, song) {
     return bg;
 }
 
-module.exports = { drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, drawSong: drawSong, PLACES: PLACES, SEGS: SEGS, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };
+module.exports = { drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };
