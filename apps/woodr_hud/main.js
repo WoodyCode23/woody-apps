@@ -360,6 +360,41 @@ async function background(bg) {
         songKey = key;
     }
 
+    /* The same card on the instrument cluster, over whatever is between the dials: the Waze map when that tool shows
+     * one there, the car's own picture otherwise. It is a small layer on the cluster's 'panel' target (1920 x 720),
+     * kept inside the part of the glass that the dials leave free (measured on this car: x 700 to 1360, y 150 to
+     * 600), drawn at the card's own size and shown one and a half times larger, because the cluster is further away
+     * than the HUD's picture. Small on purpose: a layer the size of the whole panel replaces the car's cluster
+     * scene, a small one sits on top of it. It shares the cluster's upload budget with the map, which already uses
+     * most of it, so this one carries no clock: it is drawn again only when the track, the cover or the progress
+     * bar's length changes (about every five seconds). Off unless switched on. */
+    const STAGE = { x: 700, y: 150, w: 660, h: 450 }, CLUSTER_SCALE = 1.5, CLUSTER_PAD = 12;
+    let clusterLayer = 0, clusterKey = '', clusterGeom = '';
+    function clusterBox() {
+        const at = settings.get('songClusterAt'), w = Math.round(CARD.w * CLUSTER_SCALE), h = Math.round(CARD.h * CLUSTER_SCALE);
+        const x = at === 'left' ? STAGE.x + CLUSTER_PAD : at === 'middle' ? STAGE.x + Math.round((STAGE.w - w) / 2) : STAGE.x + STAGE.w - w - CLUSTER_PAD;
+        return { x: x, y: STAGE.y + STAGE.h - h - CLUSTER_PAD, w: w, h: h };
+    }
+    function hideClusterSong() { if (clusterLayer && cr) { cr.drop(clusterLayer); } clusterLayer = 0; clusterKey = ''; }
+    function showClusterSong() {
+        const now = settings.get('song') !== false && settings.get('songCluster') === true ? song.now : null;
+        if (!now) { hideClusterSong(); return; }
+        const p = song.progress(), g = clusterBox(), geom = JSON.stringify(g);
+        const key = geom + now.title + '|' + now.artist + '|' + (p && typeof p.frac === 'number' ? Math.floor(p.frac * 40) : '') + '|' + song.coverId;
+        if (key === clusterKey && clusterLayer) return;
+        if (clusterLayer && geom !== clusterGeom) hideClusterSong();
+        if (!clusterLayer) {
+            clusterLayer = cr.image({ target: 'panel', klass: 'overlay', z: 8, x: g.x, y: g.y, w: g.w, h: g.h, iw: CARD.w, ih: CARD.h, fps: 1, sampling: 'bilinear' });
+            if (!clusterLayer) { log.warn('cluster song layer refused'); return; }
+            clusterGeom = geom;
+            log.info('song: on the cluster at ' + g.x + ',' + g.y + ' ' + g.w + 'x' + g.h);
+        }
+        const cv = new Canvas(CARD.w, CARD.h);
+        drawCard(cv, CARD.w, CARD.h, { title: now.title, artist: now.artist, left: null, frac: p ? p.frac : null, cover: song.cover });
+        cr.pixels(clusterLayer, null, Buffer.from(cv.d.buffer || cv.d));
+        clusterKey = key;
+    }
+
     let flashOn = false;
     const shiftTimer = setInterval(() => {
         try {
@@ -374,6 +409,7 @@ async function background(bg) {
             if (stage !== st.stage) log.info('shift: ' + (stage || 'off') + (rpm !== null ? ' at ' + Math.round(rpm) + ' rpm' : '') + (testLeft > 0 ? ' (test)' : ''));
             st.stage = stage;
             const running = testLeft > 0 || (rpm !== null && rpm > 400);
+            showClusterSong();
             showSong();              /* the song line is up whenever CarPlay names a track, engine or not (its switch is in the settings) */
             if (settings.get('style') !== 'frame') {
                 /* the rev bar: shown whenever the engine runs, whatever the stage; the old frame stays away */
@@ -394,7 +430,7 @@ async function background(bg) {
     const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 15000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
-    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); hideBar(); hideSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
+    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); hideBar(); hideSong(); hideClusterSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
     return { st: st, items: items, waze: waze, pick: pick, act: act, song: song };
 }
 

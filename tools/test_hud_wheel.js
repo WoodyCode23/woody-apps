@@ -17,16 +17,16 @@ const ok = (name, cond) => { if (!cond) failed++; console.log((cond ? 'ok   ' : 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* stand-ins: the kit's run() hands us the app, the car has no engine running, the wheel is ours to press */
-let impl = null, wheelOn = null;
-const layers = [];
+let impl = null, wheelOn = null, theSong = null;
+const layers = [], made = [], dropped = [], drawn = [];
 const stubs = {
     './kit/mgu': { run: (i) => { impl = i; } },
     './kit/gauges': {},
     './kit/car': function Car() { this.live = { rpm: 0 }; },
     './wheel': { Wheel: function (ctx, on) { wheelOn = on; this.start = () => Promise.resolve(true); } },
     './waze': { Waze: function () { this.st = null; this.poll = () => Promise.resolve(); this.hudBox = () => null; this.setSize = () => Promise.resolve(); } },
-    './song': { Song: function () { this.now = null; this.start = () => Promise.resolve(false); this.progress = () => null; this.cover = null; this.coverId = 0; } },
-    './cluster_render_client': { ClusterRender: function () { this.on = () => {}; this.connect = () => {}; this.image = () => { layers.push('made'); return layers.length; }; this.pixels = () => {}; this.drop = () => { layers.push('dropped'); }; this.set = () => {}; this.close = () => {}; } },
+    './song': { Song: function () { theSong = this; this.now = null; this.start = () => Promise.resolve(false); this.progress = () => null; this.cover = null; this.coverId = 0; } },
+    './cluster_render_client': { ClusterRender: function () { this.on = () => {}; this.connect = () => {}; this.image = (o) => { layers.push('made'); made.push(Object.assign({ id: layers.length }, o)); return layers.length; }; this.pixels = (id, r, buf) => { drawn.push({ id: id, bytes: buf.length }); }; this.drop = (id) => { layers.push('dropped'); dropped.push(id); }; this.set = () => {}; this.close = () => {}; } },
     './kit/canvas': require(path.join(KIT, 'canvas.js')),
     './kit/hudlink': require(path.join(KIT, 'hudlink.js')),
 };
@@ -111,6 +111,41 @@ const log = { info: (m) => logs.push(m), warn: (m) => logs.push('WARN ' + m) };
     wheelOn.onMenu();
     await sleep(900);
     ok('menu switched off: nothing opens and no gate file is kept fresh', !st.menuOpen && !fresh('wheelgate.menu'));
+
+    /* ---- the song tile on the instrument cluster ---- */
+    const panel = () => made.filter((m) => m.target === 'panel');
+    theSong.now = { title: 'A track', artist: 'Someone' };
+    theSong.progress = () => ({ left: 100, frac: 0.25 });
+    await sleep(700);
+    ok('the cluster tile is off unless switched on', values.songCluster === false && panel().length === 0);
+    values.songCluster = true;
+    await sleep(700);
+    const tile = panel()[0];
+    ok('switched on: one small layer on the cluster panel', panel().length === 1 && tile.w === 390 && tile.h === 96 && tile.iw === 260 && tile.ih === 64);
+    ok('inside the part of the glass the dials leave free, bottom right', tile.x >= 700 && tile.x + tile.w <= 1360 && tile.y >= 150 && tile.y + tile.h <= 600 && tile.x + tile.w === 1348);
+    ok('far smaller than the panel, so the car\'s own cluster stays under it', tile.w * tile.h < 1920 * 720 / 20);
+    const draws = () => drawn.filter((d) => d.id === tile.id).length;
+    ok('drawn once, as a whole card', draws() === 1 && drawn.filter((d) => d.id === tile.id)[0].bytes === 260 * 64 * 4);
+    theSong.progress = () => ({ left: 99, frac: 0.2501 });
+    await sleep(700);
+    ok('a second passing does not draw it again', draws() === 1);
+    theSong.progress = () => ({ left: 80, frac: 0.33 });
+    await sleep(700);
+    ok('the progress bar moving does', draws() === 2);
+    values.songClusterAt = 'left';
+    await sleep(700);
+    ok('moved: the old layer is dropped and a new one made at the left', dropped.indexOf(tile.id) >= 0 && panel().length === 2 && panel()[1].x === 712);
+    values.songClusterAt = 'middle';
+    await sleep(700);
+    ok('and in the middle', panel().length === 3 && panel()[2].x === 700 + Math.round((660 - 390) / 2));
+    theSong.now = null;
+    await sleep(700);
+    ok('no track: the tile is taken down', dropped.indexOf(panel()[2].id) >= 0);
+    theSong.now = { title: 'A track', artist: 'Someone' };
+    values.song = false;
+    await sleep(700);
+    ok('the song switch off keeps it off the cluster as well', panel().length === 3);
+    values.song = true; values.songCluster = false;
 
     ok('nothing warned', !logs.some((l) => /^WARN/.test(l)));
     console.log(failed ? 'FAILED: ' + failed : 'all ok');
