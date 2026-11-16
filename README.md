@@ -12,7 +12,7 @@ Apps for a 2022 BMW G80 M3 (iDrive 7 / MGU), installed over Wi-Fi from the
 | `woodr_link` | Link: the car on your own Tailscale network, locked down |
 | `woodr_warmhud` | Warm-up on the head-up display: oil, then the gearbox, then it turns itself off |
 | `woodr_screenlab` | Calibration grids for the HUD and instrument cluster, with BMW's keep-out areas |
-| `woodr_hass` | The house through Car Relay: garage doors, front door lock, doorbell camera on the cluster; QR pairing, no Home Assistant token on the car |
+| `woodr_hass` | Home Assistant, both ways, through [Car Relay](https://github.com/WoodyCode23/car-relay): your own tiles on the centre screen (doors, locks, lights, scenes, any service you choose), the doorbell camera on the cluster, and the car's readings as sensors in Home Assistant. Set up by scanning a QR with your phone; no Home Assistant token on the car |
 | `woodr_vitals` | Small warm-up / drivetrain readout (the first app; mostly superseded) |
 
 ## Install
