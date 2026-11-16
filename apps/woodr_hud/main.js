@@ -90,6 +90,9 @@ async function background(bg) {
         list.push({ g: 'Quick actions', app: null, key: 'waze', kind: 'action', label: 'Waze map', value: SIZES[sizeAt()][0] });
         list.push({ g: 'Quick actions', app: null, key: 'ambient', kind: 'action', label: 'Ambient colour', value: 'Next' });
         list.push({ g: 'Quick actions', app: null, key: 'test', kind: 'action', label: 'Test the rev bar', value: 'Run' });
+        /* Launch, while it runs: arm its tree (or cancel it) from here, whatever the centre screen shows */
+        const launch = shared.read('launch.state.json', 5000);
+        if (launch) list.push({ g: 'Quick actions', app: null, key: 'launch', kind: 'action', label: 'Launch', value: launch.state === 'armed' ? 'Cancel' : launch.state === 'run' ? 'Running' : 'Arm the tree' });
         /* with the wheel gate the menu button no longer opens the car's own list: this row lets one press through */
         if (gateWanted()) list.push({ g: 'Quick actions', app: null, key: 'carlist', kind: 'action', label: 'Car\'s audio list', value: 'Open' });
         try { hudlink.apps(APP_ID).forEach((a) => a.items.forEach(row(a.title, a.id))); } catch (e) { log.warn('menu: apps: ' + e); }
@@ -179,6 +182,19 @@ async function background(bg) {
         else if (key === 'shift') { st.shiftOn = !st.shiftOn; settings.set('shift', st.shiftOn); }
         else if (key === 'waze') { sizeIx = (sizeIx + 1) % SIZES.length; waze.setSize(SIZES[sizeIx][1]).catch(() => {}); say('Waze map: ' + SIZES[sizeIx][0]); }
         else if (key === 'test') { st.testUntil = Date.now() + 6500; say('Rev bar test running'); }
+        else if (key === 'launch') {
+            const was = shared.read('launch.state.json', 5000);
+            if (!was) { say('Launch is not running: open it once'); return; }
+            if (was.state === 'run') { say('Launch: a run is being timed'); return; }
+            if (!shared.write('launch.arm.json', { from: 'hud' })) { say('Launch: could not be asked'); return; }
+            /* the tree shows where this menu is: out of its way, and say why if Launch would not arm */
+            closeMenu();
+            setTimeout(() => {
+                try { const now = shared.read('launch.state.json', 5000); if (now && now.state === 'idle' && now.hint) log.info('menu: launch: ' + now.hint); }
+                catch (e) { log.warn('menu: launch: ' + e); }
+            }, 1500);
+            return;
+        }
         else if (key === 'carlist') {
             /* first press: the next menu-button press also goes to the car. That press lands here again: close ours. */
             if (Date.now() < st.gateOffUntil) { closeMenu(); log.info('menu: closed (the car\'s list)'); return; }

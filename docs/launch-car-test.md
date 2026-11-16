@@ -275,3 +275,21 @@ dashcam", on by default.
 - [ ] Copy one run file off the car and send it back: is `gLong` there (not null), how many rows a second
 - [ ] New signals, both optional: CDS2 acceleration (forward, sideways) and FES engine torque. If the app does
       not start or logs a refused watch, say so: 0.3.1 is the version without them
+
+## 0.7.0: a slower tree, arming from the head-up display, bumps before green
+
+- **Tree pace.** Setting "Time between the tree's lights": 1 s by default (a strip's is 0.5 s, still a choice).
+  - [ ] The ambers come one second apart, green one second after the last
+- **Arming from the head-up display.** While Launch is running, HUD's menu has "Launch" under Quick actions:
+  "Arm the tree" when idle, "Cancel" while the tree runs. It does what Arm / Reset does, whatever the centre
+  screen shows, and HUD's menu closes so the tree can be seen. Needs HUD 0.9.2. Launch has to have been opened
+  once since the head unit started, and its first-run notice accepted.
+  - [ ] With Launch open: HUD menu, Quick actions, Launch: the tree starts; again: "CANCELLED"
+  - [ ] With another screen showing (Launch opened earlier): the same
+  - [ ] Launch never opened since the restart: the row is not in the menu
+  - [ ] Log: `launch: asked from the head-up display menu`, then `launch: armed by hud`
+- **A bump is not a red light.** Before green, movement is a start only once the car has gone a foot or reached
+  5 km/h. Less than that, and coming to rest again, is forgotten; the run's log line says how many bumps.
+  - [ ] Held on the brake against the engine, a lurch that the brakes catch: the tree stays as it was, no red
+  - [ ] Leave on green afterwards: a normal reaction time; log `... 1 bump(s) before green ignored`
+  - [ ] Roll away properly before green: still a red light, reported from where the car first moved

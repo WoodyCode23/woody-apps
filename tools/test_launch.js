@@ -160,15 +160,81 @@ check('jump start: moving before green is a red light, reported with how early, 
     assert(x.r.rt < 0);
     near(x.r.et.ft60, closed(5, false).dist(60 * T.FT), TOL, '60 ft');
 });
-check('jump start: the tree shows red from the moment the car moves', () => {
+check('jump start: the tree shows red once the car has really gone, not at the first twitch', () => {
     const tm = new T.LaunchTimer({});
     tm.sample(0, 0); tm.tick(1000);
-    assert(tm.arm(1000, T.treeSchedule('pro', 1500)));
+    assert(tm.arm(1000, T.treeSchedule('pro', 1500, 2500)));        /* green at 3500 */
     assert.deepStrictEqual(tm.lights(2600).ambers, [true, true, true]);
     tm.sample(2600, 0.2); tm.sample(2620, 2.0);
+    assert.strictEqual(tm.state, 'armed', '2 km/h for a moment is not a start');
+    assert.strictEqual(tm.lights(2630).red, false);
+    tm.sample(2640, 6.5);
     assert.strictEqual(tm.state, 'run');
+    assert(tm.tMove > 2600 && tm.tMove < 2620, 'timed from where it first moved: ' + tm.tMove);
     assert.deepStrictEqual(tm.lights(2700), { ambers: [false, false, false], green: false, red: true });
     assert.deepStrictEqual(tm.lights(9000), { ambers: [false, false, false], green: false, red: true });
+});
+/* a car held on the brake against the engine: it lurches, the brakes catch it, and it leaves on green */
+function bumpRun(bump) {
+    const tm = new T.LaunchTimer({});
+    tm.sample(0, 0); tm.tick(1000);
+    assert(tm.arm(1000, T.treeSchedule('sportsman', 1500, 1000)));        /* green at 5500 */
+    let t = 1000;
+    const feed = (to, speedAt) => { for (; t < to; t += 20) { tm.tick(t); const v = speedAt(t); if (v !== null) tm.sample(t + 7, v); } };      /* a sample never lands on the tick's own instant */
+    feed(3000, () => null);
+    bump(feed);
+    feed(5800, () => null);                                             /* standing: nothing new from the car; 0.3 s after green */
+    const go = t;
+    feed(20000, (x) => (tm.state === 'done' ? null : Math.min(160, (x - go) / 1000 * 5 * 3.6)));
+    return { tm: tm, r: tm.result, go: go };
+}
+check('a bump against the brakes before green is not a red light: the run is timed from the real start', () => {
+    const x = bumpRun((feed) => { feed(3300, (t) => 3 * Math.sin(Math.PI * (t - 3000) / 300)); feed(3320, () => 0); });      /* up to 3 km/h for 0.3 s: about 16 cm */
+    assert(x.r, 'the run finished');
+    assert.strictEqual(x.r.red, false); assert.strictEqual(x.r.bumps, 1);
+    assert(x.r.rt > 0.25 && x.r.rt < 0.4, 'reaction from green to the real start: ' + x.r.rt);
+    assert(x.r.et.ft60 > 1.5 && x.r.et.ft60 < 3.5 && x.r.et.mph60 > 5 && x.r.et.mph60 < 5.6, JSON.stringify(x.r.et));
+    assert.strictEqual(x.tm.lights(4000).red, false);
+});
+check('two bumps are two bumps; the tree never showed red for them', () => {
+    const x = bumpRun((feed) => { feed(3200, () => 2); feed(3400, () => 0); feed(4000, () => null); feed(4150, () => 2.5); feed(4170, () => 0); });
+    assert.strictEqual(x.r.red, false); assert.strictEqual(x.r.bumps, 2);
+});
+check('a bump that keeps going is a start: more than a foot, or faster than a crawl, before green is red', () => {
+    const far = bumpRun((feed) => { feed(4200, () => 3); });                  /* 3 km/h for 1.2 s is a metre */
+    assert.strictEqual(far.r.red, true); assert(far.r.rt < -2.3 && far.r.rt > -2.6, 'reported from where it first moved: ' + far.r.rt);
+    const fast = bumpRun((feed) => { feed(3100, (t) => (t - 3000) / 100 * 8); });
+    assert.strictEqual(fast.r.red, true);
+    assert(T.CREEP_M <= 0.31 && T.CREEP_KMH <= 5, 'the allowance stays small');
+});
+check('still creeping a little when the light goes green: started at green, not before it', () => {
+    const tm = new T.LaunchTimer({});
+    tm.sample(0, 0); tm.tick(1000);
+    assert(tm.arm(1000, T.treeSchedule('pro', 1500)));                       /* green at 2900 */
+    tm.tick(2790);                                                           /* standing until now, as the clock carries it */
+    for (let t = 2800; t < 2900; t += 20) tm.sample(t, 1.5);                 /* 4 cm in the last tenth of a second */
+    assert.strictEqual(tm.state, 'armed');
+    tm.sample(2910, 2.5); tm.sample(2930, 9);
+    assert.strictEqual(tm.state, 'run');
+    assert.strictEqual(tm.tMove, 2900); assert.strictEqual(tm.lights(3000).red, false); assert.strictEqual(tm.lights(3000).green, true);
+});
+check('the tree can be slowed for practice: the same order, further apart; a strip\'s half second is still there', () => {
+    assert.deepStrictEqual(T.treeSchedule('sportsman', 1000).ambers, [1000, 1500, 2000]); assert.strictEqual(T.treeSchedule('sportsman', 1000).green, 2500);
+    const slow = T.treeSchedule('sportsman', 1000, 1000);
+    assert.deepStrictEqual([slow.ambers, slow.green, slow.gapMs], [[1000, 2000, 3000], 4000, 1000]);
+    assert.strictEqual(T.treeSchedule('pro', 1000).green, 1400); assert.strictEqual(T.treeSchedule('pro', 1000, 1000).green, 1800);
+    assert.deepStrictEqual(T.treeLights(slow, 2500).ambers, [false, true, false]);
+    [NaN, 'x', -5, 0].forEach((g) => assert(T.treeSchedule('sportsman', 1000, g).green >= 1000 + 3 * 300));
+    assert.strictEqual(T.treeSchedule('sportsman', 1000, 99999).gapMs, 3000);
+    const spec = JSON.parse(fs.readFileSync(path.join(APP, 'app.json'), 'utf8')), s = spec.settings.filter((x) => x.key === 'treeGap')[0];
+    assert(s && s.default === 1000 && s.options.some((o) => o[0] === 500), 'slower by default, the strip\'s pace a choice');
+});
+check('arming from the head-up display menu: Launch reads a small file, HUD offers the row only while Launch runs', () => {
+    const main = fs.readFileSync(path.join(APP, 'main.js'), 'utf8'), hud = fs.readFileSync(path.join(APP, '..', 'woodr_hud', 'main.js'), 'utf8');
+    assert(/statSync\(path\.join\(shared\.DIR, 'launch\.arm\.json'\)\)/.test(main) && /Date\.now\(\) - at > 5000/.test(main), 'only a fresh press counts');
+    assert(/shared\.write\('launch\.state\.json'/.test(main) && /shared\.read\('launch\.state\.json', 5000\)/.test(hud));
+    assert(/shared\.write\('launch\.arm\.json', \{ from: 'hud' \}\)/.test(hud) && /key: 'launch'/.test(hud));
+    assert(/noticeSeen'\) !== true\) \{ hint\(/.test(main), 'never before the first-run notice was accepted');
 });
 check('a clean start shows green and no red', () => {
     const tm = new T.LaunchTimer({});
@@ -747,7 +813,7 @@ check('launches are marked on the dashcam: Launch writes its own request file, a
 });
 check('app.json: version, logging id, required signals only where another installed app already requires them', () => {
     const spec = JSON.parse(fs.readFileSync(path.join(APP, 'app.json'), 'utf8'));
-    assert.strictEqual(spec.id, 'woodr_launch'); assert.strictEqual(spec.title, 'Launch'); assert.strictEqual(spec.version, '0.6.0'); assert.strictEqual(spec.loggingId, 'OAB4');
+    assert.strictEqual(spec.id, 'woodr_launch'); assert.strictEqual(spec.title, 'Launch'); assert.strictEqual(spec.version, '0.7.0'); assert.strictEqual(spec.loggingId, 'OAB4');
     const required = [];
     Object.keys(spec.signals).forEach((i) => { if (!spec.signals[i]._optional) Object.keys(spec.signals[i]).forEach((f) => { if (/r/.test(spec.signals[i][f])) required.push(i.split('.').pop() + '.' + f); }); });
     assert.deepStrictEqual(required.sort(), ['CDS.statusEngineSpeed2', 'Vehicle2.statusCarSpeed2']);

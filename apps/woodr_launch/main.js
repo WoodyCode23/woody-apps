@@ -24,6 +24,7 @@
  * Timing is from the car's speed signal (about 48 to 70 samples a second), not from GPS or a beam.
  * Every timer, signal and button handler below catches its own errors: an uncaught one would end the app.
  */
+const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
 const Car = require('./kit/car');
@@ -152,7 +153,7 @@ mgu.run({
             }
             const t = now();
             timer.setRollout(settings.get('rollout') === true);
-            const sched = T.treeSchedule(settings.get('tree') === 'pro' ? 'pro' : 'sportsman', T.preStageDelay(Math.random()));
+            const sched = T.treeSchedule(settings.get('tree') === 'pro' ? 'pro' : 'sportsman', T.preStageDelay(Math.random()), Number(settings.get('treeGap')) || 1000);
             if (!timer.arm(t, sched)) { hint('NOT ARMED: NO SPEED FROM THE CAR YET'); return; }
             st.result = null; st.first = []; st.greenLogged = false; st.movedLogged = false; st.hint = '';
             /* the bests this run is measured against on the cluster's pop-ups: real runs only, same rollout */
@@ -167,6 +168,33 @@ mgu.run({
             log.info('launch: cancelled by ' + by);
         }
         function newRun() { timer.reset(); st.result = null; st.hint = ''; }
+
+        /* Arming from the head-up display's menu (HUD's quick action "Launch"): a small file HUD touches, read here.
+         * It does what the Arm / Reset button does, whichever screen is showing. Launch says what state it is in
+         * through launch.state.json, so HUD can show the row only while Launch runs and say what came of the press. */
+        const remoteArm = { seen: 0, checked: 0, told: 0 };
+        function tell(t) {
+            if (t - remoteArm.told < 1000) return;
+            remoteArm.told = t;
+            shared.write('launch.state.json', { state: timer.state, ready: ready().all, hint: st.hint || '' });
+        }
+        function remoteAsked(t) {
+            if (t - remoteArm.checked < 200) return;
+            remoteArm.checked = t;
+            let at = 0;
+            try { at = fs.statSync(path.join(shared.DIR, 'launch.arm.json')).mtime.getTime(); } catch (e) { if (!remoteArm.seen) remoteArm.seen = 1; return; }
+            if (at <= remoteArm.seen) return;
+            const first = remoteArm.seen === 0;
+            remoteArm.seen = at;
+            if (first || Date.now() - at > 5000) return;                 /* an old press, from before this app started or long ago */
+            if (settings.get('noticeSeen') !== true) { hint('OPEN LAUNCH ON THE CENTRE SCREEN ONCE FIRST'); return; }
+            log.info('launch: asked from the head-up display menu');
+            st.page = 'main';
+            if (timer.state === 'idle') arm('hud');
+            else if (timer.state === 'armed') cancel('hud');
+            else if (timer.state === 'done' && timer.stopped()) { newRun(); arm('hud'); }
+            remoteArm.told = 0;
+        }
 
         function action() {
             if (settings.get('noticeSeen') !== true) { settings.set('noticeSeen', true); log.info('launch: first-run notice accepted'); return; }
@@ -231,7 +259,7 @@ mgu.run({
             st.doneAt = now();
             const hd = T.headline(res);
             log.info('launch: run ended (' + res.end + (res.aborted ? ', no split reached' : '') + ')' + (hd ? ' ' + hd.label + ' ' + hd.s.toFixed(3) + ' s' : '') +
-                ', reaction ' + res.rt.toFixed(3) + ' s' + (res.red ? ' RED LIGHT' : '') + ', peak ' + res.peakKmh.toFixed(1) + ' km/h, ' + res.samples + ' samples at ' +
+                ', reaction ' + res.rt.toFixed(3) + ' s' + (res.red ? ' RED LIGHT' : '') + (res.bumps ? ', ' + res.bumps + ' bump(s) before green ignored' : '') + ', peak ' + res.peakKmh.toFixed(1) + ' km/h, ' + res.samples + ' samples at ' +
                 res.hz.toFixed(1) + '/s, longest gap ' + res.maxGapMs + ' ms, bad samples ' + res.glitches + (demo ? ', DEMO' : ''));
             log.info('launch: splits ' + JSON.stringify(rec.et));
             if (st.first.length) log.info('launch: first speeds [ms after the first, km/h] ' + JSON.stringify(st.first.map((x) => [x[0], Math.round(x[1] * 1000) / 1000])));
@@ -260,6 +288,7 @@ mgu.run({
             }
             if (t - rateAt >= 1000) { st.speedHz = Math.round(st.speedN * 1000 / (t - rateAt)); st.speedN = 0; rateAt = t; }
             timer.tick(t);
+            try { remoteAsked(t); tell(t); } catch (e) { log.warn('launch: hud menu: ' + e); }
 
             if (timer.state === 'armed' && !st.greenLogged && t >= timer.tGreen) { st.greenLogged = true; log.info('launch: green'); }
             if (timer.state === 'run' && !st.movedLogged) {

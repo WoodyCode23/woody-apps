@@ -2,7 +2,7 @@
   "id": "woodr_launch",
   "title": "Launch",
   "description": "A drag-strip style launch timer: staging, a countdown tree, and a full timeslip (reaction, 60 ft to 1 mile, 0-60, 60-130 and more) with a history of your runs and a data log of each one (speed, revs, gear, pull, an estimate of wheelspin). The tree and the run also show on the instrument cluster and the head-up display. It only measures: it arms and changes nothing on the car. Closed courses and private land only.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "vendor": "custom",
   "loggingId": "OAB4",
   "iconGlyph": "live_data",
@@ -72,6 +72,35 @@
           "Pro (all ambers, green 0.4 s later)"
         ]
       ]
+    },
+    {
+      "key": "treeGap",
+      "label": "Time between the tree's lights",
+      "type": "choice",
+      "default": 1000,
+      "options": [
+        [
+          500,
+          "0.5 s (as on a strip)"
+        ],
+        [
+          750,
+          "0.75 s"
+        ],
+        [
+          1000,
+          "1 s"
+        ],
+        [
+          1500,
+          "1.5 s"
+        ],
+        [
+          2000,
+          "2 s"
+        ]
+      ],
+      "hudLabel": "Tree pace"
     },
     {
       "key": "rollout",

@@ -22,6 +22,10 @@
  *   - The clock starts when speed passes MOVE_KMH, the moment found by interpolating between the two samples
  *     around it. With rollout on, it starts after the first foot of travel instead.
  *   - Reaction time is first movement minus green. Movement before green is a red light; the run is still timed.
+ *   - A bump is not a start. A car held on the brake against the engine can lurch a hand's width before the
+ *     brakes catch it again. Before green, movement counts as a start only once the car has gone CREEP_M or
+ *     reached CREEP_KMH; less than that, and coming to rest again, is forgotten. A car still creeping that
+ *     little when the light goes green is taken to start at green.
  *   - Distance is speed added up over time (trapezoid). Between two samples speed is taken as a straight line,
  *     so the moment a distance mark is passed is the root of a quadratic, not a guess at a sample edge.
  *   - A run ends when the car stops, when no new top speed was seen for LIFT_MS after the 60 ft mark (the
@@ -47,6 +51,10 @@ const RAW_INVALID = 65535;       /* the signal's "no value" */
 const MPH = 1.609344;            /* km/h in one mph */
 const FT = 0.3048;               /* metres in one foot */
 const MOVE_KMH = 0.5;            /* speed that counts as "moving" (the kit's figure) */
+const CREEP_M = FT;                /* before green, less travel than this (a strip's staging beam allows about a foot) ... */
+const CREEP_KEEP = 300;           /* samples of a creep kept, should it turn into a start (about five seconds) */
+const CREEP_KMH = 5;              /* ... at less than this speed is a bump against the brakes, not a start */
+const TREE_GAP_MS = 500;          /* a strip's tree: half a second from one light to the next */
 const ROLLOUT_M = FT;            /* one foot of rollout, as a drag strip's staging beam gives */
 const TRAP_M = 66 * FT;          /* a strip's speed trap: the average over the last 66 ft before the line */
 const MAX_RUN_MS = 60000;
@@ -94,14 +102,18 @@ function preStageDelay(rnd) {
  * When each light comes on, in ms after arming.
  *   sportsman: three ambers 0.5 s apart, green 0.5 s after the last
  *   pro:       all three ambers together, green 0.4 s later
+ * gapMs stretches it for practice: the time from one light to the next (500 on a strip); the pro tree's wait
+ * for green grows by the same ratio.
  */
-function treeSchedule(type, preMs) {
+function treeSchedule(type, preMs, gapMs) {
     const pro = type === 'pro';
     const pre = num(preMs) ? preMs : 1500;
+    const gap = num(gapMs) ? clamp(gapMs, 300, 3000) : TREE_GAP_MS;
     return {
         type: pro ? 'pro' : 'sportsman', preMs: pre,
-        ambers: pro ? [pre, pre, pre] : [pre, pre + 500, pre + 1000],
-        green: pro ? pre + 400 : pre + 1500,
+        gapMs: gap,
+        ambers: pro ? [pre, pre, pre] : [pre, pre + gap, pre + 2 * gap],
+        green: pro ? pre + Math.round(gap * 0.8) : pre + 3 * gap,
     };
 }
 
@@ -140,6 +152,8 @@ class LaunchTimer {
         this.samples = 0; this.maxGapMs = 0; this.glitches = 0;
         this.trace = [];             /* [seconds, km/h] every 0.1 s, for a small graph */
         this.last = null;            /* the newest split: { key, label, s } */
+        this.creep = null;           /* moving a little before green: { d: metres so far, buf: its samples } */
+        this.bumps = 0;              /* bumps before green that came to rest again */
     }
 
     setRollout(on) { if (this.state === 'idle' || this.state === 'done') this.rollout = !!on; }
@@ -183,7 +197,27 @@ class LaunchTimer {
             return;
         }
         this.prev = { t: t, v: v };
-        if (this.state === 'armed' && v >= MOVE_KMH && p) this._launch(p, this.prev);
+        if (this.state !== 'armed' || !p) return;
+        if (v < MOVE_KMH) {
+            if (this.creep) { this.creep = null; this.bumps++; }      /* it lurched and the brakes caught it: forgotten */
+            return;
+        }
+        if (t < this.tGreen) {
+            /* moving before green: a start only once it has gone far enough or fast enough to be one */
+            if (!this.creep) this.creep = { d: 0, buf: [p] };
+            const k = this.creep;
+            k.d += (p.v + v) / 2 / 3.6 * (t - p.t) / 1000;
+            k.buf.push(this.prev);
+            if (k.buf.length > CREEP_KEEP) k.buf.shift();
+            if (k.d >= CREEP_M || v >= CREEP_KMH) {
+                /* a real start before green: timed from where it first moved, sample by sample, as any run is */
+                this._launch(k.buf[0], k.buf[1]);
+                for (let i = 2; i < k.buf.length && this.state === 'run'; i++) this._step(k.buf[i - 1], k.buf[i]);
+            }
+            return;
+        }
+        /* green is on. A car that was still creeping when it came on started at green, not before it. */
+        this._launch(p, this.prev, this.creep ? this.tGreen : undefined);
     }
 
     /**
@@ -209,9 +243,11 @@ class LaunchTimer {
         return this.t60 !== null && this.tPeak !== null && t - Math.max(this.tPeak, this.t60) > LIFT_MS;
     }
 
-    _launch(p, c) {
+    _launch(p, c, notBefore) {
         const f = c.v > p.v ? (MOVE_KMH - p.v) / (c.v - p.v) : 0;
         this.tMove = p.t + clamp(f, 0, 1) * (c.t - p.t);
+        if (num(notBefore) && this.tMove < notBefore) this.tMove = Math.min(notBefore, c.t);
+        this.creep = null;
         this.state = 'run';
         this.dist = 0;
         if (!this.rollout) this.t0 = this.tMove;
@@ -300,6 +336,7 @@ class LaunchTimer {
             hz: dur > 0 ? this.samples / dur : 0,
             maxGapMs: Math.round(this.maxGapMs),
             glitches: this.glitches,
+            bumps: this.bumps,
         };
         this.state = 'done';
     }
@@ -330,6 +367,6 @@ function headline(r) {
 }
 
 module.exports = {
-    LaunchTimer, kmhFromRaw, preStageDelay, treeSchedule, treeLights, headline,
+    LaunchTimer, kmhFromRaw, preStageDelay, treeSchedule, treeLights, headline, CREEP_M, CREEP_KMH, TREE_GAP_MS,
     DIST, SPEED, SPLIT_KEYS, MPH, FT, MOVE_KMH, ROLLOUT_M, TRAP_M, MAX_RUN_MS, LIFT_MS, GREEN_WAIT_MS, RAW_INVALID,
 };
