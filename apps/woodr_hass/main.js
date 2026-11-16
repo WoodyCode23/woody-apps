@@ -8,7 +8,8 @@
  *   shared.js     /dev/shm/woody/garage.json for Ambient Studio (green closed, red open)
  *
  * What the screen shows follows the relay:
- *   not set up        relay.json is missing from the app's data folder
+ *   not set up        relay.json is missing from the app's data folder: the set-up screen (setup.js), a QR the
+ *                     phone opens to send the house's address, or a keyboard on the screen when that cannot work
  *   not paired        a Pair button, then a QR and a code to approve from an allowed phone
  *   locked, no phone  the logo, nothing else: the house is not shown to whoever sits in the car
  *   locked, scan      a QR and a code (after the Lock button, or in the set hours)
@@ -27,6 +28,7 @@ const qrcode = require('./qrcode');
 const shared = require('./shared');
 const { Relay } = require('./relay');
 const { Doorbell } = require('./doorbell');
+const S = require('./setup');
 
 const W = 1600, H = 520;
 const APP_ID = 'woodr_hass';
@@ -174,6 +176,10 @@ async function background(bg) {
     const { settings, log } = bg;
     const car = new Car(bg, ['speed', 'rpm', 'temps', 'gear', 'condition']);
     const relay = new Relay(bg.dataDir, log);
+    /* telling the car where the house is (setup.js): the address arrives, relay.json is written, the relay reads it */
+    const setup = new S.Setup(bg.dataDir, log, { allowHttp: process.env.CAR_RELAY_DEV === '1' });
+    setup.on('saved', () => { try { relay.stop(); relay.start(); hooks.say('Address saved. Next: pair this car.', 8); hooks.refresh(); } catch (e) { log.warn('setup saved: ' + e); } });
+    setup.on('change', () => { try { hooks.refresh(); } catch (e) { log.warn('setup change: ' + e); } });
     const doorbell = new Doorbell(bg, relay, APP_ID);
     const hooks = { say: () => {}, refresh: () => {} };      /* the screens fill these in when there are any */
     const unlocked = () => relay.state === 'paired' && relay.fresh() && relay.session.unlocked;
@@ -256,6 +262,7 @@ async function background(bg) {
             tellGarage();
             /* settings are read here, not in an onChange handler: the kit keeps one handler, and it is the screens' */
             if (settings.get('reload') === true) { settings.set('reload', false); relay.stop(); relay.start(); hooks.say('relay.json read again'); }
+            if (settings.get('setAddress') === true) { settings.set('setAddress', false); hooks.setAddress(); }
             if (settings.get('testBell') === true) { settings.set('testBell', false); doorbell.ring('Front door (test)', 'front_door'); }
             if (settings.get('doorbell') === 'off' && doorbell.status().shown) doorbell.dismiss('turned off');
             if (relay.state === 'paired' && relay.online && wantsScan(relay.session)) relay.scanCode();
@@ -273,9 +280,10 @@ async function background(bg) {
         if (garage.told) shared.write('garage.json', { ok: false });
         doorbell.stop();
         relay.stop();
+        setup.stop();
     });
 
-    return { car: car, relay: relay, doorbell: doorbell, hooks: hooks, unlocked: unlocked };
+    return { car: car, relay: relay, doorbell: doorbell, hooks: hooks, unlocked: unlocked, setup: setup };
 }
 
 mgu.run({
@@ -283,7 +291,26 @@ mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
         const bgm = ctx.background || await background(ctx);
-        const { relay, doorbell, hooks, unlocked } = bgm;
+        const { relay, doorbell, hooks, unlocked, setup } = bgm;
+        /* the set-up screen: 'phone' (a QR for the phone's page) or 'keys' (the keyboard); typed: the keyboard's text */
+        const su = { mode: '', typed: 'https://', err: '', forced: false };
+        const needsSetup = () => relay.state === 'unconfigured' || su.forced;
+        function openSetup(force) {
+            su.forced = !!force; su.err = ''; su.mode = 'phone';
+            if (process.env.SETUP_KEYS === '1') { su.mode = 'keys'; refresh(); return; }      /* the keyboard straight away: for the PC preview */
+            setup.start().then((ok) => { if (!ok) su.mode = 'keys'; refresh(); }).catch((e) => { su.mode = 'keys'; log.warn('setup: ' + e); refresh(); });
+        }
+        function closeSetup() { setup.stop(); su.forced = false; su.mode = ''; refresh(); }
+        hooks.setAddress = () => { openSetup(true); };
+        setup.on('saved', () => { su.forced = false; su.mode = ''; su.typed = 'https://'; });
+        function saveTyped() {
+            const n = S.normalise(su.typed, process.env.CAR_RELAY_DEV === '1');
+            if (!n.ok) { su.err = n.why; refresh(); return; }
+            try { S.save(ctx.dataDir, n.base, 'Car'); } catch (e) { su.err = 'Could not save: ' + e.message; refresh(); return; }
+            setup.stop(); su.forced = false; su.mode = ''; su.typed = 'https://';
+            log.info('setup: relay.json written from the keyboard');
+            relay.stop(); relay.start(); say('Address saved. Next: pair this car.', 8);
+        }
 
         let sel = 0;
         const busy = {};                  /* tile id -> true while an action is in flight */
@@ -352,6 +379,47 @@ mgu.run({
             cv.text('New code in ' + left + ' s', 580, 420, 22, left < 30 ? t.warn : t.dim);
         }
 
+        /* ---- set-up: the phone's page, or the keyboard */
+        function drawSetupPhone(cv, t) {
+            const links = setup.links();
+            if (setup.state === 'starting' || (!links.length && setup.state === 'open')) {
+                cv.text(setup.state === 'starting' ? 'Getting ready...' : 'This car is not on a network your phone can reach', 80, 200, 30, t.text, { font: 'bold' });
+                cv.text('Turn on your phone\'s hotspot and connect the car to it, or use the keyboard.', 80, 250, 24, t.dim);
+            } else if (links.length) {
+                drawQr(cv, links[0].url, 80, 92, 360);
+                cv.text('Tell the car where your house is', 500, 140, 32, t.text, { font: 'bold' });
+                cv.text('1. Your phone on the same network as the car (its hotspot is easiest).', 500, 196, 24, t.dim);
+                cv.text('2. Point the camera at the code and open the page.', 500, 232, 24, t.dim);
+                cv.text('3. Paste your Home Assistant address and press Save.', 500, 268, 24, t.dim);
+                cv.text(links[0].url, 500, 320, 20, t.text, { literal: true });
+                const left = Math.max(0, Math.round((setup.until - Date.now()) / 60000));
+                cv.text('Open for about ' + left + ' more min. Nothing goes beyond this car\'s own network.', 500, 352, 20, t.dim);
+            } else {
+                cv.text(setup.state === 'closed' ? 'The page closed after wrong tries' : 'The phone page is closed', 80, 200, 30, t.text, { font: 'bold' });
+            }
+            button(cv, t, 500, 386, 300, 64, 'Use the keyboard', t.accent, 'su-keys', () => { setup.stop(); su.mode = 'keys'; refresh(); });
+            button(cv, t, 820, 386, 260, 64, 'New code', t.accent, 'su-again', () => { openSetup(su.forced); });
+            if (su.forced) button(cv, t, 1100, 386, 220, 64, 'Cancel', t.dim, 'su-cancel', () => { closeSetup(); });
+        }
+        function drawSetupKeys(cv, t) {
+            cv.text('Your Home Assistant address', 24, 72, 24, t.dim);
+            cv.roundRect(24, 84, W - 48, 50, 10, '#16161b');
+            const shown = su.typed.length > 64 ? '...' + su.typed.slice(-61) : su.typed;
+            cv.text(shown + '_', 40, 119, 28, t.text, { font: 'bold', literal: true });
+            if (su.err) cv.text(su.err, W - 40, 119, 20, t.warn, { align: 'right' });
+            const kw = 132, kh = 52, gap = 8, x0 = 24;
+            S.KEYS.forEach((row, r) => row.split('').forEach((ch, c) => {
+                button(cv, t, x0 + c * (kw + gap), 146 + r * (kh + gap), kw, kh, ch, t.accent, 'k-' + ch, () => { su.typed = S.press(su.typed, ch); su.err = ''; refresh(); });
+            }));
+            const y = 146 + 4 * (kh + gap), bw = 190;
+            S.WORDS.forEach((wd, i) => button(cv, t, x0 + i * (bw + gap), y, bw, kh, wd[0], t.accent, 'w-' + i, () => { su.typed = S.press(su.typed, wd[1]); su.err = ''; refresh(); }));
+            const bx = x0 + 3 * (bw + gap);
+            button(cv, t, bx, y, 150, kh, 'Delete', t.dim, 'k-del', () => { su.typed = S.press(su.typed, 'del'); refresh(); });
+            button(cv, t, bx + 158, y, 130, kh, 'Clear', t.dim, 'k-clear', () => { su.typed = S.press(su.typed, 'clear'); refresh(); });
+            button(cv, t, bx + 296, y, 200, kh, 'Save', GREEN, 'k-save', () => { saveTyped(); });
+            button(cv, t, bx + 504, y, 170, kh, 'Phone', t.accent, 'k-phone', () => { openSetup(su.forced); });
+        }
+
         function drawLocked(cv, t, line) {
             drawLogo(cv, t, W / 2, 230, 120);
             if (line && settings.get('hints') !== false) cv.text(line, W / 2, 410, 24, t.dim, { align: 'center' });
@@ -397,8 +465,10 @@ mgu.run({
             const cv = ctx.canvas(W, H).clear(t.bg);
             const noted = Date.now() < noteUntil && note;
             const s = relay.session || {};
-            if (relay.state === 'unconfigured') {
-                drawLocked(cv, t, relay.error || 'Not set up yet: relay.json is missing from this app\'s data folder.');
+            if (needsSetup()) {
+                if (!su.mode) openSetup(su.forced);
+                if (su.mode === 'keys') drawSetupKeys(cv, t); else drawSetupPhone(cv, t);
+                if (relay.error && !su.forced) drawFooter(cv, t, relay.error, t.warn);
             } else if (relay.state === 'unpaired') {
                 drawLogo(cv, t, 400, 270, 120);
                 cv.text('This car is not paired', 640, 190, 36, t.text, { font: 'bold' });
