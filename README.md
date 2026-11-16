@@ -55,6 +55,6 @@ git subtree pull --prefix=kit --squash <path-or-url-to-idrive7-apps> <branch-wit
 ```
 BMW's oap-sdk is never committed (`oap-sdk/` is ignored); the head unit supplies it at build time.
 
-Licences: our own apps, tools and docs are under the PolyForm Noncommercial License 1.0.0 (source-available:
-read it, use it, change it and share it for any noncommercial purpose; no selling or other commercial use). `kit/` and
-anything copied from other projects keep their original licences. See [NOTICE.md](NOTICE.md) and [LICENSE.md](LICENSE.md).
+Licences: our own apps, components, tools and docs are open source under the GNU General Public License, version 3
+or later (GPL-3.0-or-later): use, study, change and share them, and share what you build on them the same way. `kit/` and
+anything copied from other projects keep their original licences. See [NOTICE.md](NOTICE.md) and [LICENSE](LICENSE).

@@ -1,19 +1,23 @@
 # Licence notice
 
-Required Notice: Copyright (c) 2026 BimmerApps (https://bimmerapps.com)
+Copyright (C) 2026 BimmerApps (https://bimmerapps.com)
 
 ## Our own work
 
 Everything in this repository that we wrote is licensed under the
-[PolyForm Noncommercial License 1.0.0](LICENSE.md): the apps under `apps/woodr_*`, `tools/`, `docs/`, and the
-notes in the top folder. In plain words, which do not replace the licence text:
+[GNU General Public License, version 3](LICENSE) or (at your option) any later version (GPL-3.0-or-later): the
+apps under `apps/woodr_*`, `components/`, `tools/`, `docs/`, and the notes in the top folder. In plain words,
+which do not replace the licence text:
 
-- You may read it, use it, change it and share it, including changed versions, for any noncommercial purpose.
-- You may not sell it or use it commercially.
-- Copies you share must keep the "Required Notice" line above and these terms.
+- You may use it, study it, change it and share it, including changed versions, for any purpose.
+- If you share it, changed or not, you share it under these same terms, with its source.
+- It comes with no warranty of any kind.
 
-This is source-available, not open source: the noncommercial condition is what separates the two. For anything the licence does not allow, ask:
-hello@bimmerapps.com.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the licence for details.
+
+Until 2026-11-16 this repository was under the PolyForm Noncommercial License 1.0.0. Copies taken before that
+date keep the terms they were taken under; everything from that date on is GPL-3.0-or-later.
 
 ## Other people's work, under their own licences
 
