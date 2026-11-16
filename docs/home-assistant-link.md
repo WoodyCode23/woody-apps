@@ -26,15 +26,22 @@ Un-pairing is done from Home Assistant and takes effect at once.
 
 ## What the car can ask for
 
-You decide this in the go-between's configuration, tile by tile. Each tile has a kind:
+You decide this in the go-between's configuration, tile by tile. The car's screens are another dashboard for
+your house: what is on them and what they may do is yours to set.
 
-- **Cover** (a garage door): the car can ask to close it.
-- **Lock**: the car can ask to lock it.
-- **Camera**: the car can ask for a picture, or a short live view.
-- **Sensor**: read only.
+- **Built-in kinds:** cover (open, close, stop), lock (lock; unlock only if you allow it, below), light, switch,
+  fan and input_boolean (on, off), button and input_button (press), scene, script, sensor, camera.
+- **Your own actions:** any tile can carry actions of its own: a name, any Home Assistant service and its data.
+  The car shows the first one as the tile's button.
+- **Unlocking and disarming** are off unless you set `allow_unlock: true`. With it, a lock tile offers Unlock,
+  and your own actions may release a lock or disarm an alarm. Think about who sits in your car before you turn
+  it on: the lock screen (below) is then what stands between the car and your front door.
+- Doors, locks and your own actions take two presses on the screen, unless you say `confirm: false` on an
+  action of your own.
 
-By design the go-between has no action that opens a door or releases a lock, so a car in someone else's hands cannot let anyone
-into the house. Closing and locking take two presses on the screen.
+The go-between's README has the configuration for all of this.
+
+Our own car keeps the defaults: no unlock, no position.
 
 ## The lock
 

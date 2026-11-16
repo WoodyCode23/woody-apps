@@ -32,20 +32,35 @@ const W = 1600, H = 520;
 const APP_ID = 'woodr_hass';
 const CONFIRM_MS = 4000;
 const TWICE = ['cover', 'lock'];                 /* kinds that take two presses */
+/* does this press need a second one: doors and locks always, an owner's own action unless they said confirm: false */
+function takesTwo(tile, o) { return o && typeof o.twice === 'boolean' ? o.twice : TWICE.indexOf(tile.kind) >= 0; }
 const GREEN = '#2fd27a', RED = '#ff3b30', AMBER = '#ffc21a';
 const ENGINE_RPM = 400, MOVING_KMH = 2;
 
-/** The one action a tile offers in its current state, or null. */
+/** The one action a tile offers in its current state, or null. `twice` (when set) says whether it takes two presses. */
 function offer(tile) {
-    const has = (a) => tile.actions.indexOf(a) >= 0;
+    const has = (a) => (tile.actions || []).indexOf(a) >= 0;
     if (!tile.ok) return null;
+    const o = builtIn(tile, has);
+    if (o) return o;
+    /* the owner's own action for this tile (the relay's `services:`): the first one, said as they named it */
+    const own = Array.isArray(tile.custom) ? tile.custom.filter((c) => c && typeof c.action === 'string' && c.action)[0] : null;
+    return own ? { action: own.action, label: String(own.label || own.action).slice(0, 24), twice: own.confirm !== false } : null;
+}
+function builtIn(tile, has) {
     if (tile.kind === 'cover') {
         if (tile.state === 'closed' && has('open')) return { action: 'open', label: 'Open' };
         if (tile.state === 'open' && has('close')) return { action: 'close', label: 'Close' };
         return null;                             /* moving: wait for it */
     }
-    if (tile.kind === 'lock') return tile.state === 'unlocked' && has('lock') ? { action: 'lock', label: 'Lock' } : null;
-    if (tile.kind === 'light' || tile.kind === 'switch') {
+    if (tile.kind === 'lock') {
+        if (tile.state === 'unlocked' && has('lock')) return { action: 'lock', label: 'Lock' };
+        /* only there when the owner allowed it in the relay's configuration (allow_unlock) */
+        if (tile.state === 'locked' && has('unlock')) return { action: 'unlock', label: 'Unlock' };
+        return null;
+    }
+    if ((tile.kind === 'button' || tile.kind === 'input_button') && has('press')) return { action: 'press', label: 'Press' };
+    if (tile.kind === 'light' || tile.kind === 'switch' || tile.kind === 'input_boolean' || tile.kind === 'fan') {
         if (tile.state === 'on' && has('off')) return { action: 'off', label: 'Turn off' };
         if (tile.state !== 'on' && has('on')) return { action: 'on', label: 'Turn on' };
         return null;
@@ -292,7 +307,7 @@ mgu.run({
                 say(doorbell.status().shown ? tile.name + ': showing for a minute, press again to close' : tile.name + ': the picture only shows while parked', 5);
                 return;
             }
-            if (TWICE.indexOf(tile.kind) >= 0) {
+            if (takesTwo(tile, o)) {
                 const now = Date.now();
                 if (!armed || armed.id !== tile.id || armed.action !== o.action || now > armed.until) {
                     armed = { id: tile.id, action: o.action, until: now + CONFIRM_MS };
@@ -364,7 +379,7 @@ mgu.run({
                 const bh = rows > 1 ? 50 : 76, by = y + ch - bh - 18;
                 if (busy[tile.id]) cv.text('Sending...', x + 22, by + bh / 2 + 8, 24, t.dim);
                 else if (o) {
-                    const twice = TWICE.indexOf(tile.kind) >= 0;
+                    const twice = takesTwo(tile, o);
                     button(cv, t, x + 18, by, cw - 36, bh, isArmed ? 'Press again: ' + o.label : o.label,
                         isArmed ? AMBER : t.accent, 'tile-' + i, () => { sel = i; press(tile); });
                     if (twice && !isArmed && rows === 1) cv.text('press twice', x + cw / 2, by - 12, 18, t.dim, { align: 'center' });
