@@ -14,6 +14,7 @@
  *
  * Either way the result is the same file the hand-written set-up used: <dataDir>/relay.json { base, name }.
  *
+ * It listens on one network only, the one the QR names (a phone hotspot first, else Wi-Fi; never a VPN).
  * The page only answers with the right code, only while the screen is open, at most ten minutes, and closes for
  * good after five wrong tries. It takes one small form and nothing else: no file, no command, no redirect. It is
  * plain HTTP on the car's own network; what goes over it is the house's address, which is not a secret (the relay
@@ -126,6 +127,11 @@ class Setup extends EventEmitter {
         this.code = code(8); this.tries = 0; this.why = ''; this.state = 'starting';
         this.until = Date.now() + (this.opts.openMs || OPEN_MS);
         const ports = this.opts.ports || PORTS;
+        /* one network only: the car's best address that is not a VPN (a phone hotspot, else Wi-Fi), never all of them */
+        const best = addresses(this.opts.ifaces).filter((a) => a.rank < 9)[0];
+        this.host = this.opts.host || (best && best.address) || '';
+        this.hostShown = (best && best.address) || '';
+        if (!this.host) { this.state = 'failed'; this.why = 'no network'; this.log.warn('setup: the car is on no network a phone can reach: the on-screen keyboard it is'); this.emit('change'); return Promise.resolve(false); }
         const tryPort = (i) => new Promise((resolve) => {
             if (i >= ports.length) { resolve(false); return; }
             const srv = http.createServer((req, res) => { try { this._serve(req, res); } catch (e) { try { res.statusCode = 500; res.end(); } catch (x) { /* gone */ } } });
@@ -134,7 +140,7 @@ class Setup extends EventEmitter {
                 this.why = e.code || e.message;
                 tryPort(i + 1).then(resolve);
             });
-            srv.listen(ports[i], this.opts.host || '0.0.0.0', () => { this.server = srv; this.port = srv.address().port; resolve(true); });
+            srv.listen(ports[i], this.host, () => { this.server = srv; this.port = srv.address().port; resolve(true); });
         });
         return tryPort(0).then((ok) => {
             if (!ok) { this.state = 'failed'; this.log.warn('setup: cannot listen (' + this.why + '): the on-screen keyboard it is'); this.emit('change'); return false; }
@@ -150,7 +156,7 @@ class Setup extends EventEmitter {
 
     links() {
         if (this.state !== 'open') return [];
-        return addresses(this.opts.ifaces).map((a) => ({ url: 'http://' + a.address + ':' + this.port + '/s/' + this.code, iface: a.iface }));
+        return this.hostShown ? [{ url: 'http://' + this.hostShown + ':' + this.port + '/s/' + this.code }] : [];
     }
 
     stop() {

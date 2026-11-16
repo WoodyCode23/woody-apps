@@ -8,6 +8,10 @@
  *   <dataDir>/relay.json         { "base": "https://<host>/api/car_relay/v1", "name": "M3" }
  *                                put there by hand; never in the repo
  *   <dataDir>/relay-token.json   { "token": "<dev>.<secret>" }   written once, at pairing (0600)
+ *   <dataDir>/relay-token-for.json { "base": "https://..." }   the address that token was issued by (0600). The token is
+ *                                sent to that address and nowhere else: when relay.json names another one, the car
+ *                                is unpaired until it pairs again there (approved from an allowed phone). A token from
+ *                                before this file existed is tied to the address relay.json names when it is first read.
  *
  * States: 'unconfigured' (no relay.json) -> 'unpaired' -> 'pairing' (a code is on the screen)
  *         -> 'paired' (long-polling).
@@ -60,6 +64,7 @@ class Relay extends EventEmitter {
         this.log = log;
         this.cfgFile = path.join(dataDir, 'relay.json');
         this.tokenFile = path.join(dataDir, 'relay-token.json');
+        this.tokenForFile = path.join(dataDir, 'relay-token-for.json');
         this.base = null;
         this.name = 'M3';
         this.token = null;
@@ -103,6 +108,18 @@ class Relay extends EventEmitter {
             const t = JSON.parse(fs.readFileSync(this.tokenFile, 'utf8')).token;
             if (typeof t === 'string' && t.indexOf('.') > 0) this.token = t;
         } catch (e) { /* not paired yet */ }
+        if (this.token && this.base) {
+            let issuedBy = null;
+            try { issuedBy = String(JSON.parse(fs.readFileSync(this.tokenForFile, 'utf8')).base || ''); } catch (e) { issuedBy = null; }
+            if (issuedBy === null) {
+                /* a token from before the address was recorded: it belongs to the address it has been used with */
+                try { writeWhole(this.tokenForFile, JSON.stringify({ base: this.base.href }), 0o600); } catch (e) { this.log.warn('relay: could not record the token\'s address: ' + e.message); }
+            } else if (issuedBy !== this.base.href) {
+                this.log.warn('relay: the pairing is for another address; not sent to this one');
+                this.token = null;
+                this.error = 'This car was paired with a different address. Pair again.';
+            }
+        }
         this.state = !this.base ? 'unconfigured' : this.token ? 'paired' : 'unpaired';
     }
 
@@ -234,7 +251,7 @@ class Relay extends EventEmitter {
         this._http('POST', '/pair/status', { pair_id: this.pairing.pair_id }).then((r) => {
             const s = r.json && r.json.status;
             if (s === 'approved' && r.json.token) {
-                try { writeWhole(this.tokenFile, JSON.stringify({ token: r.json.token, at: Date.now() }), 0o600); }
+                try { writeWhole(this.tokenForFile, JSON.stringify({ base: this.base.href }), 0o600); writeWhole(this.tokenFile, JSON.stringify({ token: r.json.token, at: Date.now() }), 0o600); }
                 catch (e) { this.log.warn('relay: token not saved: ' + e.message); }
                 this.token = r.json.token;
                 this.pairing = null;

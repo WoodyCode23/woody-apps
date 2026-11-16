@@ -146,6 +146,41 @@ check('when the car will not let the app listen, it says so and the keyboard tak
         });
     });
 });
+check('the pairing token goes only to the address that issued it', () => {
+    const { Relay } = require(path.join(__dirname, '..', 'apps', 'woodr_hass', 'relay.js'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hass-token-'));
+    const write = (base) => fs.writeFileSync(path.join(dir, 'relay.json'), JSON.stringify({ base: base, name: 'M3' }));
+    const A = 'https://house.example.com/api/car_relay/v1', B = 'https://elsewhere.example.net/api/car_relay/v1';
+    write(A);
+    fs.writeFileSync(path.join(dir, 'relay-token.json'), JSON.stringify({ token: 'dev1.secret' }));
+    const quiet = { info() {}, warn() {} };
+    let r = new Relay(dir, quiet); r.load();
+    assert.strictEqual(r.token, 'dev1.secret', 'an existing pairing keeps working');
+    assert.strictEqual(r.state, 'paired');
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'relay-token-for.json'), 'utf8')).base, A, 'and is now tied to its address');
+    write(B);
+    r = new Relay(dir, quiet); r.load();
+    assert.strictEqual(r.token, null, 'pointed elsewhere: the token is not used');
+    assert.strictEqual(r.state, 'unpaired'); assert(/paired with a different address/.test(r.error));
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'relay-token.json'), 'utf8')).token, 'dev1.secret', 'the token file itself is left alone');
+    write(A);
+    r = new Relay(dir, quiet); r.load();
+    assert.strictEqual(r.token, 'dev1.secret', 'back at its own address it works again');
+});
+check('the phone page listens on one network only: the hotspot or Wi-Fi it shows, never a VPN or every interface', () => {
+    const s = new S.Setup(fs.mkdtempSync(path.join(os.tmpdir(), 'hass-setup-')), null, { ports: [0],
+        ifaces: { tailscale0: [{ family: 'IPv4', address: '100.101.1.2' }], lo: [{ family: 'IPv4', address: '127.0.0.1', internal: true }] } });
+    return s.start().then((ok) => {
+        assert.strictEqual(ok, false, 'only a VPN: no page, the keyboard');
+        assert.strictEqual(s.state, 'failed');
+        const src = fs.readFileSync(path.join(__dirname, '..', 'apps', 'woodr_hass', 'setup.js'), 'utf8');
+        assert(!/0\.0\.0\.0/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')), 'never all interfaces');
+    });
+});
+check('changing the address of a paired car needs the owner\'s phone in the car', () => {
+    const main = fs.readFileSync(path.join(__dirname, '..', 'apps', 'woodr_hass', 'main.js'), 'utf8');
+    assert(/relay\.state !== 'unconfigured' && relay\.state !== 'unpaired' && !unlocked\(\)\) \{ say\('Unlock with your phone first/.test(main));
+});
 check('the app uses it, and every handler in setup.js keeps its errors to itself', () => {
     const main = fs.readFileSync(path.join(__dirname, '..', 'apps', 'woodr_hass', 'main.js'), 'utf8');
     assert(/require\('\.\/setup'\)/.test(main) && /setup\.start\(\)/.test(main) && /S\.KEYS/.test(main), 'main.js wires the set-up');

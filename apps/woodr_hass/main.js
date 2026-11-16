@@ -301,7 +301,13 @@ mgu.run({
             setup.start().then((ok) => { if (!ok) su.mode = 'keys'; refresh(); }).catch((e) => { su.mode = 'keys'; log.warn('setup: ' + e); refresh(); });
         }
         function closeSetup() { setup.stop(); su.forced = false; su.mode = ''; refresh(); }
-        hooks.setAddress = () => { openSetup(true); };
+        /* a paired car's address changes only while it is unlocked (an allowed phone is in the car): otherwise anyone
+         * in the seat could point it elsewhere. Its token would not follow anyway (relay.js sends it only to the
+         * address that issued it), but the car would stop reaching the house until it is paired again. */
+        hooks.setAddress = () => {
+            if (relay.state !== 'unconfigured' && relay.state !== 'unpaired' && !unlocked()) { say('Unlock with your phone first, then change the address', 8); return; }
+            openSetup(true);
+        };
         setup.on('saved', () => { su.forced = false; su.mode = ''; su.typed = 'https://'; });
         function saveTyped() {
             const n = S.normalise(su.typed, process.env.CAR_RELAY_DEV === '1');
