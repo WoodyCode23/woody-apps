@@ -2,7 +2,7 @@
   "id": "woodr_hud",
   "title": "HUD",
   "description": "A menu on the head-up display worked from the steering wheel: every app's switches and choices in one roller, and a press changes one while the menu stays open. A rev bar across the top of the display that changes colour and blinks at the shift point, and the song CarPlay is playing with its time left. Read-only: signals in, pixels out.",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",
@@ -66,6 +66,13 @@
       "type": "bool",
       "default": true,
       "hudLabel": "Rev bar"
+    },
+    {
+      "key": "coldBar",
+      "label": "Lower the red on the rev bar while the oil is cold (needs Warm-Up HUD)",
+      "type": "bool",
+      "default": true,
+      "hudLabel": "Cold rev limit"
     },
     {
       "key": "style",

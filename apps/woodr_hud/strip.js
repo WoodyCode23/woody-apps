@@ -28,6 +28,24 @@ function barFill(w, h, rpm) {
     return Math.round((f > 0 ? (f < 1 ? f : 1) : 0) * b.span / STEP) * STEP;
 }
 
+/**
+ * The zones while the oil is cold: the red starts lower and climbs to its own place as the oil warms.
+ * zones: { green, yellow, red, shift } rpm as set; cold: { oil, readyAt } deg C from Warm-Up HUD, or null.
+ * From COLD_RPM at COLD_OIL degrees and below, in a straight line to the set red at readyAt, in steps of 100.
+ * Guidance only, on the careful side: not a BMW figure. Warm, or with nothing known, the zones come back as set.
+ */
+const COLD_RPM = 3000, COLD_OIL = 20;
+function coldZones(zones, cold) {
+    const z = { green: Number(zones.green) || 4000, yellow: Number(zones.yellow) || 5500, red: Number(zones.red) || 6300, shift: Number(zones.shift) || 6800, cold: false };
+    const oil = cold && cold.oil, ready = cold && cold.readyAt;
+    if (typeof oil !== 'number' || !isFinite(oil) || typeof ready !== 'number' || !isFinite(ready) || ready <= COLD_OIL || oil >= ready || z.red <= COLD_RPM) return z;
+    const f = Math.max(0, (oil - COLD_OIL) / (ready - COLD_OIL));
+    const red = Math.round((COLD_RPM + f * (z.red - COLD_RPM)) / 100) * 100;
+    if (red >= z.red) return z;
+    const yellow = Math.min(z.yellow, red - 700);
+    return { green: Math.min(z.green, yellow - 500), yellow: yellow, red: red, shift: Math.min(z.shift, red + 500), cold: true };
+}
+
 /** the rev bar filled to `fill` pixels (see barFill): white, then yellow from zones.yellow rpm, then red from zones.red */
 function drawBar(cv, w, h, fill, zones) {
     const b = band(w, h), xOf = (rpm) => rpm / RPM_FULL * b.span;
@@ -129,4 +147,4 @@ function drawCard(cv, w, h, song) {
     return bg;
 }
 
-module.exports = { drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };
+module.exports = { coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };

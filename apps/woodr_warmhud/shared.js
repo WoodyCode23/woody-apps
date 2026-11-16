@@ -3,6 +3,7 @@
  * shared.js - small files in /dev/shm/woody that let the Woody apps steer each other without sockets.
  *
  *   hud.json     written by HUD's menu: { warmup: 'auto' | 'hide' | 'show', at }   (Warm-Up HUD reads it)
+ *   warmup.json  written by Warm-Up HUD while the engine runs: { oil, readyAt } deg C   (HUD's rev bar reads it)
  *   ambient.json written by HUD's menu: { cmd: 'next', n, at }                      (Ambient Studio reads it)
  *
  * Each app runs as its own user, so the folder is 1777 (anyone writes, only a file's owner replaces it) and the

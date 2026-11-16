@@ -12,6 +12,7 @@
  */
 const { Canvas } = require('./kit/canvas');
 const { HudClaim } = require('./kit/hud_claim');
+const { LowTyre } = require('./lowtyre');
 
 let ClusterRender = null;
 try { ClusterRender = require('./cluster_render_client').ClusterRender; } catch (e) { /* reported by start() */ }
@@ -27,6 +28,7 @@ const HUD_WINDOW = { x: 120, y: 100, w: 570, h: 278 };
  * SLOT is what is left clear in every view, so placement needs no idea which view is on. */
 const SLOT = { x: 220, y: 185, w: 470, h: 133 };
 const IW = 400, IH = 120;
+const TYRE_STAGE_MAX_MS = 10 * 60000;   /* tyres that will not reach the mark in this weather do not hold the HUD all drive */
 const FPS = 5;                       /* warm-up moves slowly; no reason to burn cluster bandwidth */
 
 const COLD = '#ff9d3b', WARM = '#ffd34d', READY = '#2fd27a', DIM = '#8a8a8a', TEXT = '#ffffff';
@@ -128,6 +130,8 @@ class WarmHud {
         this.transWaitSince = 0;            /* when the trans phase began without a reading */
         this.firstTrans = null;
         this.tyresOk = false; this.tyreWaitSince = 0; this.firstTyre = null;
+        this.tyreStageSince = 0;            /* when the tyre stage began: it gives up after TYRE_STAGE_MAX_MS */
+        this.lowTyre = new LowTyre();
     }
 
     available() { return !!ClusterRender; }
@@ -176,7 +180,7 @@ class WarmHud {
 
         /* re-arm a finished drive only once the oil is properly cold again */
         if (this.done && num(d.oil) && d.oil < o.readyAt - 20) {
-            this.done = false; this.readySince = 0; this.transWaitSince = 0; this.tyreWaitSince = 0;
+            this.done = false; this.readySince = 0; this.transWaitSince = 0; this.tyreWaitSince = 0; this.tyreStageSince = 0;
             this.ctx.log.info('hud: oil cold again, warm-up shown again');
         }
         if (this.done) return 'done';
@@ -207,7 +211,13 @@ class WarmHud {
                 if (now - this.tyreWaitSince > 60000) {
                     this.tyresOk = true; this.ctx.log.warn('hud: no tyre temperature after 60 s, skipping the tyre stage');
                 } else { this.readySince = 0; return 'tyres'; }
-            } else { this.tyreWaitSince = 0; this.readySince = 0; return 'tyres'; }
+            } else {
+                this.tyreWaitSince = 0;
+                if (!this.tyreStageSince) this.tyreStageSince = now;
+                if (now - this.tyreStageSince > TYRE_STAGE_MAX_MS) {
+                    this.tyresOk = true; this.ctx.log.info('hud: tyres still under the mark after 10 min, tyre stage ended');
+                } else { this.readySince = 0; return 'tyres'; }
+            }
         }
 
         if (!this.readySince) this.readySince = now;
@@ -248,9 +258,10 @@ class WarmHud {
         const su = shownUnits(set, this.carUnits);
         o.pressureUnit = su.press; o.tempUnit = su.temp;
         let ph = this._phase(d, o);
-        /* a low tyre shows whatever the warm-up is doing, and after it is done */
+        /* a low tyre shows whatever the warm-up is doing, and after it is done: for a while each time (lowtyre.js),
+         * never for the whole drive */
         const low = d.tyres && d.tyres.lowest;
-        if (o.pressureWarn > 0 && low && num(low.p) && num(low.target) && low.target - low.p >= o.pressureWarn) {
+        if (this.lowTyre.show(low && num(low.p) && num(low.target) ? low.target - low.p : null, o.pressureWarn, Date.now())) {
             d = Object.assign({}, d, { tyres: Object.assign({}, d.tyres, { low: low }) });
             ph = 'pressure';
         }
@@ -265,7 +276,7 @@ class WarmHud {
 
         /* nothing until the first oil reading; nothing once done */
         /* the driver's double-tap wins over the automatic: hidden, or shown (as 'ready' when the warm-up is done) */
-        if (this.user === 'hide' && ph !== 'pressure') { if (this.layer) this.off(); return st; }
+        if (this.user === 'hide') { if (this.layer) this.off(); return st; }      /* hidden means hidden, a low tyre too: the car's own warning still shows */
         if (this.user === 'show' && set.get('hud') !== false) { if (ph === 'done') ph = 'ready'; }
         else if (!on || ph === 'done' || (!num(d.oil) && ph !== 'pressure')) { if (this.layer) this.off(); return st; }
 

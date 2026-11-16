@@ -30,7 +30,7 @@ const { Canvas, withAlpha } = require('./kit/canvas');
 const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
 const { Song } = require('./song');
-const { drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
+const { coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
 const shared = require('./shared');
 const fs = require('fs');
 const path = require('path');
@@ -300,9 +300,17 @@ async function background(bg) {
     }, 400);
 
     /* ---------- shift lights ---------- */
+    /* the zones now: as set, or lower while Warm-Up HUD says the oil is cold (its warmup.json, a few seconds old at most) */
+    let zoneNote = '';
+    function zones() {
+        const set = { green: settings.get('greenRpm'), yellow: settings.get('yellowRpm'), red: settings.get('redRpm'), shift: settings.get('shiftRpm') };
+        const z = coldZones(set, settings.get('coldBar') !== false ? shared.read('warmup.json', 5000) : null);
+        const note = z.cold ? 'cold, red from ' + z.red : 'as set';
+        if (note !== zoneNote) { zoneNote = note; log.info('rev bar: ' + note); }
+        return z;
+    }
     function stageOf(rpm) {
-        const g = Number(settings.get('greenRpm')) || 4000, y = Number(settings.get('yellowRpm')) || 5500,
-            r = Number(settings.get('redRpm')) || 6300, s = Number(settings.get('shiftRpm')) || 6800;
+        const z = zones(), g = z.green, y = z.yellow, r = z.red, s = z.shift;
         if (rpm >= s) return 'flash';
         if (rpm >= r) return 'red';
         if (rpm >= y) return 'yellow';
@@ -340,10 +348,10 @@ async function background(bg) {
             barVisible = true;
         }
         const filled = barFill(g.w, g.h, rpm);
-        const key = filled + '|' + (settings.get('yellowRpm') || '') + '|' + (settings.get('redRpm') || '');
+        const z = zones(), key = filled + '|' + z.yellow + '|' + z.red;
         if (key !== barKey) {
             const cv = new Canvas(g.w, g.h);
-            drawBar(cv, g.w, g.h, filled, { yellow: settings.get('yellowRpm'), red: settings.get('redRpm') });
+            drawBar(cv, g.w, g.h, filled, { yellow: z.yellow, red: z.red });
             cr.pixels(barLayer, null, Buffer.from(cv.d.buffer || cv.d));
             barKey = key;
         }

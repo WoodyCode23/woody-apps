@@ -37,10 +37,15 @@ async function background(bg) {
         const engineOn = Date.now() - rpmSeen < 5000;
         return engineOn && bg.settings.get('trans') !== false && !hud.done;
     };
-    let polling = false;
+    let polling = false, toldAt = 0;
     const tick = () => {
         try {
             followMenu();
+            /* the oil, for HUD's rev bar (it lowers its red while the oil is cold): once a second, engine running only */
+            if (Date.now() - toldAt >= 1000 && typeof car.live.oil === 'number' && Date.now() - rpmSeen < 5000) {
+                toldAt = Date.now();
+                shared.write('warmup.json', { oil: Math.round(car.live.oil), readyAt: Number(bg.settings.get('readyAt')) || 90 });
+            }
             const want = wantGearbox();
             if (want && !polling) { gearbox.start(); polling = true; bg.log.info('gearbox: polling (engine running)'); }
             else if (!want && polling) { gearbox.stop(); polling = false; bg.log.info('gearbox: stopped'); }
