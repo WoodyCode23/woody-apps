@@ -34,6 +34,20 @@ makes the package.
 | `woodr-link` | Link: holds Tailscale to the car policy | Link shows that its service is missing |
 | `woodr-wheelgate` | HUD: keeps the wheel's menu button and roller from opening the car's own list while HUD's menu is up | HUD works; the car's list opens alongside it |
 
+Installing one (done this way for `woodr-dashkeep` on one car; the other two have only been placed by hand):
+
+1. On a computer: `node tools/pack_component.js components/woodr-dashkeep` makes a `.tgz` holding the component's
+   description (each file with its checksum), its files and its service units.
+2. Copy the `.tgz` to the head unit, into any writable folder under `/var/opt`.
+3. As root on the head unit, with the car parked: `sh /var/opt/mgu-deploy/mgu-deploy.sh check --artifact <path>.tgz`
+   shows what it would touch; then the same with `install --artifact <path>.tgz --yes`. This needs the MGU Store's
+   deploy tool on the unit.
+4. Do not start, stop or restart the new service by hand afterwards. The deploy tool hands it to the head unit's
+   recovery manager, which reads its list only at boot; starting a listed service by hand reset the head unit once.
+   It runs from the next head-unit start.
+
+The wheel gate is not installed this way: its own README has the steps.
+
 Everything here has been developed and tested on a single vehicle. Read the code before you run it on yours.
 
 ## Develop
