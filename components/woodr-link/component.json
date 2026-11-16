@@ -1,0 +1,27 @@
+{
+  "id": "woodr-link",
+  "kind": "tool",
+  "version": "0.1.0",
+  "title": "Woody Link service",
+  "description": "Tailscale for the car, locked down: fetched from Tailscale's own site, run with shields up and no exit node, routes, DNS or SSH. Used by the Woody Link app.",
+  "mguHmi": ["ID7"],
+  "optional": true,
+  "uninstallable": true,
+  "files": [
+    { "path": "helper.js", "mode": "0644" },
+    { "path": "fetch-tailscale.sh", "mode": "0644" },
+    { "path": "tailscale.pin", "mode": "0644" },
+    { "path": "README.md", "mode": "0644" }
+  ],
+  "units": [
+    { "name": "woodr-link.service" },
+    { "name": "woodr-link-helper.service" }
+  ],
+  "enable": [
+    { "unit": "woodr-link.service", "target": "oapcontroller.service" },
+    { "unit": "woodr-link-helper.service", "target": "oapcontroller.service" }
+  ],
+  "restart": ["woodr-link.service", "woodr-link-helper.service"],
+  "keepRunning": true,
+  "postInstall": ["fetch-tailscale.sh"]
+}

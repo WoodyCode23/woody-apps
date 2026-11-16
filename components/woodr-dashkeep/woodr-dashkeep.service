@@ -1,0 +1,18 @@
+# Keeps the dash cam's finished clips on the car (keeper.js): hard links in /var/opt/hdshare/ent/woody-dashcam, oldest out first.
+[Unit]
+Description=BimmerApps Dashcam: clips kept on the car
+RequiresMountsFor=/var/opt
+After=local-fs.target
+
+[Service]
+User=root
+ExecStart=/usr/bin/env node /var/opt/woodr-dashkeep/current/keeper.js
+Restart=always
+RestartSec=10
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=64M
+TimeoutStopSec=5
+
+[Install]
+WantedBy=oapcontroller.service

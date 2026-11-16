@@ -1,0 +1,155 @@
+{
+  "id": "woodr_diag",
+  "title": "Diagnostics",
+  "description": "A read-only look at the car: which control units answer, the 12 V battery, tyres, live values and service records. It reads only: no clearing, no coding, nothing written to any control unit.",
+  "version": "0.2.2",
+  "vendor": "custom",
+  "loggingId": "OAB2",
+  "iconGlyph": "dtc_scanner",
+  "mguHmi": [
+    "ID7"
+  ],
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineTemperature": "rs",
+      "statusEngineSpeed2": "rs",
+      "statusBattery2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "_optional": "gear and selector position",
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_optional": "read-only diagnostics (UDS 22 only): control unit list, gearbox temperature, service records",
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    },
+    "de.bmw.infotainment.vehicle.TPMS": {
+      "_optional": "tyre pressures, temperatures and targets",
+      "statusTyrePressure": "rs",
+      "statusTyreTemperature": "rs",
+      "statusTargetTyrePressure": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "the car's display units (TPMS sends pressure and temperature in them)",
+      "statusNewCurrentUnitsStatusExt": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Diagnostics",
+      "buttons": [
+        [
+          "BTN_PAGE",
+          "Next page"
+        ],
+        [
+          "BTN_ACTION",
+          "Read again"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "speedUnit",
+      "label": "Speed unit",
+      "type": "choice",
+      "default": "mph",
+      "options": [
+        [
+          "kmh",
+          "km/h"
+        ],
+        [
+          "mph",
+          "mph"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "Temperature unit",
+      "type": "choice",
+      "default": "car",
+      "options": [
+        [
+          "car",
+          "Same as the car"
+        ],
+        [
+          "c",
+          "Celsius"
+        ],
+        [
+          "f",
+          "Fahrenheit"
+        ]
+      ]
+    },
+    {
+      "key": "pressureUnit",
+      "label": "Pressure unit",
+      "type": "choice",
+      "default": "car",
+      "options": [
+        [
+          "car",
+          "Same as the car"
+        ],
+        [
+          "psi",
+          "psi"
+        ],
+        [
+          "bar",
+          "bar"
+        ],
+        [
+          "kpa",
+          "kPa"
+        ]
+      ]
+    },
+    {
+      "key": "accent",
+      "label": "Red",
+      "type": "choice",
+      "default": "signal",
+      "options": [
+        [
+          "signal",
+          "Signal red"
+        ],
+        [
+          "m",
+          "M red"
+        ],
+        [
+          "orange",
+          "Orange red"
+        ],
+        [
+          "pink",
+          "Pink red"
+        ]
+      ],
+      "hudLabel": "Accent colour"
+    }
+  ]
+}

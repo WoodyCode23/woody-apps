@@ -1,0 +1,197 @@
+{
+  "id": "woodr_launch",
+  "title": "Launch",
+  "description": "A drag-strip style launch timer: staging, a countdown tree, and a full timeslip (reaction, 60 ft to 1 mile, 0-60, 60-130 and more) with a history of your runs and a data log of each one (speed, revs, gear, pull, an estimate of wheelspin). The tree and the run also show on the instrument cluster and the head-up display. It only measures: it arms and changes nothing on the car. Closed courses and private land only.",
+  "version": "0.6.0",
+  "vendor": "custom",
+  "loggingId": "OAB4",
+  "iconGlyph": "live_data",
+  "mguHmi": [
+    "ID7"
+  ],
+  "signals": {
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "_optional": "gear and selector position: without it staging cannot check that drive is selected",
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
+    },
+    "de.bmw.infotainment.controlelements.SteeringWheelPushButton": {
+      "_optional": "the steering wheel roller's press: without it the tree is armed from the centre screen only",
+      "statusRotaryPress": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "_optional": "acceleration, for the run's data log: without it there is no pull or wheelspin figure",
+      "statusLongitudinalAccelerationMassCenter": "s",
+      "statusLateralAccelerationMassCenter": "s"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "_optional": "engine torque, for the run's data log",
+      "statusActualValueTorque2": "s"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Launch",
+      "buttons": [
+        [
+          "BTN_ACTION",
+          "Arm / Reset"
+        ],
+        [
+          "BTN_PAGE",
+          "History"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "tree",
+      "label": "Tree",
+      "type": "choice",
+      "default": "sportsman",
+      "options": [
+        [
+          "sportsman",
+          "Sportsman (three ambers 0.5 s apart)"
+        ],
+        [
+          "pro",
+          "Pro (all ambers, green 0.4 s later)"
+        ]
+      ]
+    },
+    {
+      "key": "rollout",
+      "label": "1 ft rollout (the clock starts after the first foot)",
+      "type": "bool",
+      "default": false,
+      "hudLabel": "1 ft rollout"
+    },
+    {
+      "key": "speedUnit",
+      "label": "Speed unit",
+      "type": "choice",
+      "default": "mph",
+      "options": [
+        [
+          "mph",
+          "mph"
+        ],
+        [
+          "kmh",
+          "km/h"
+        ]
+      ]
+    },
+    {
+      "key": "shiftRpm",
+      "label": "Rev bar blinks from",
+      "type": "number",
+      "unit": "rpm",
+      "default": 6800,
+      "min": 4000,
+      "max": 7300,
+      "step": 100
+    },
+    {
+      "key": "shiftBar",
+      "label": "Rev bar on the head-up display during a run",
+      "type": "bool",
+      "default": true,
+      "hudLabel": "Rev bar in a run"
+    },
+    {
+      "key": "screens",
+      "label": "Show the tree and the run on",
+      "type": "choice",
+      "default": "all",
+      "options": [
+        [
+          "all",
+          "Centre screen, cluster and head-up display"
+        ],
+        [
+          "hud",
+          "Centre screen and head-up display"
+        ],
+        [
+          "cluster",
+          "Centre screen and cluster"
+        ],
+        [
+          "centre",
+          "Centre screen only"
+        ]
+      ],
+      "hudLabel": "Shown on"
+    },
+    {
+      "key": "clusterLook",
+      "label": "On the cluster",
+      "type": "choice",
+      "default": "middle",
+      "options": [
+        [
+          "middle",
+          "In the middle, between the car's own dials"
+        ],
+        [
+          "whole",
+          "Whole cluster (the car's dials make way while it shows)"
+        ]
+      ],
+      "hudLabel": "Cluster look"
+    },
+    {
+      "key": "wheelArm",
+      "label": "Arm with a press of the steering wheel's right roller",
+      "type": "bool",
+      "default": true,
+      "hudLabel": "Arm with roller"
+    },
+    {
+      "key": "highlight",
+      "label": "Mark every launch as a highlight on the dashcam",
+      "type": "bool",
+      "default": true,
+      "hudLabel": "Highlight launches"
+    },
+    {
+      "key": "demo",
+      "label": "Demo data (a simulated car)",
+      "type": "choice",
+      "default": "off",
+      "options": [
+        [
+          "off",
+          "Off"
+        ],
+        [
+          "on",
+          "On"
+        ]
+      ],
+      "hud": false
+    },
+    {
+      "key": "noticeSeen",
+      "label": "First-run notice accepted",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    }
+  ]
+}

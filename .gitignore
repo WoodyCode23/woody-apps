@@ -18,14 +18,10 @@ recon/
 *.pem
 *.key
 HANDOFF.md
-# closed-source apps live in the private bimmerapps-pro repository; tools/link.sh there links them in for builds
-apps/woodr_dashcam
-apps/woodr_diag
-apps/woodr_link
-apps/woodr_launch
+# these still live in the private bimmerapps-pro repository; tools/link.sh there links them in for builds
 apps/woodr_valet
 apps/woodr_report
 apps/woodr_guard
 apps/woodr_audiolab
 apps/woodr_studio
-components/
+apps/woodr_scout

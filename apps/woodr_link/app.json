@@ -1,0 +1,43 @@
+{
+  "id": "woodr_link",
+  "title": "Link",
+  "description": "Puts the car on your own Tailscale network, locked down: shields up, no exit node, no routes, no SSH. You log in on your phone with a QR code; the car never sees a password. Needs the Link service.",
+  "version": "0.1.1",
+  "vendor": "custom",
+  "loggingId": "OAB3",
+  "iconGlyph": "live_data",
+  "mguHmi": [
+    "ID7"
+  ],
+  "signals": {},
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Link",
+      "buttons": [
+        [
+          "BTN_ACTION",
+          "Connect / Disconnect"
+        ],
+        [
+          "BTN_LOGOUT",
+          "Log out"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "hints",
+      "label": "Show the lock-down line",
+      "type": "bool",
+      "default": true,
+      "hud": false
+    }
+  ]
+}

@@ -1,0 +1,177 @@
+{
+  "id": "woodr_dashcam",
+  "title": "Dashcam",
+  "description": "BMW's drive recorder as a loop dash cam: while driving it keeps saving clips of all cameras and copies each one to a USB stick, oldest clips making room. A lab view shows the video buffer live and times every save. Needs BMW's Drive Recorder switched on.",
+  "version": "0.4.2",
+  "vendor": "custom",
+  "loggingId": "OAAF",
+  "iconGlyph": "live_data",
+  "autostart": true,
+  "mguHmi": [
+    "ID7"
+  ],
+  "signals": {
+    "de.bmw.infotainment.video.videobuffer.VideoBuffer": {
+      "_instances": "VideoBuffer",
+      "_optional": "the drive recorder's video buffer",
+      "currentStatus": "rs",
+      "currentConfiguration": "rs",
+      "_methods": [
+        "storeVideo"
+      ]
+    },
+    "de.bmw.infotainment.video.cameraproxy.ICAM2Proxy": {
+      "_optional": "the camera proxy, switched to DR_ACTIVE before a save as BMW's app does",
+      "currentState": "rs",
+      "_methods": [
+        "clientAttach",
+        "clientDetach",
+        "changeState"
+      ]
+    },
+    "de.bmw.infotainment.devicemanager.devicemanagement.DeviceManagement": {
+      "_optional": "USB sticks: which one is plugged in and where it is mounted",
+      "_methods": [
+        "registerHandler",
+        "unregisterHandler"
+      ],
+      "_broadcasts": [
+        "deviceConnected",
+        "deviceDisconnected"
+      ]
+    },
+    "de.bmw.infotainment.usbrwcontrol.USBRWControl": {
+      "_instances": "MGU",
+      "_optional": "write access to a USB stick, as BMW's recorder asks for when it exports",
+      "_methods": [
+        "accquireRWSession",
+        "releaseRWSession"
+      ]
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Dashcam",
+      "buttons": [
+        [
+          "BTN_ACTION",
+          "Highlight this clip"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "allow",
+      "label": "Allow camera commands",
+      "type": "bool",
+      "default": false,
+      "hud": false
+    },
+    {
+      "key": "loop",
+      "label": "Loop recording while driving",
+      "type": "bool",
+      "default": false,
+      "hudLabel": "Loop recording"
+    },
+    {
+      "key": "past",
+      "label": "Seconds before each save",
+      "type": "number",
+      "unit": "s",
+      "default": 20,
+      "min": 5,
+      "max": 60,
+      "step": 5
+    },
+    {
+      "key": "future",
+      "label": "Seconds after each save",
+      "type": "number",
+      "unit": "s",
+      "default": 20,
+      "min": 5,
+      "max": 60,
+      "step": 5
+    },
+    {
+      "key": "overlap",
+      "label": "Start the next clip early by",
+      "type": "number",
+      "unit": "s",
+      "default": 0,
+      "min": 0,
+      "max": 20,
+      "step": 1
+    },
+    {
+      "key": "active",
+      "label": "Switch the cameras to DR_ACTIVE before saving (as BMW does)",
+      "type": "bool",
+      "default": true,
+      "hud": false
+    },
+    {
+      "key": "quiet",
+      "label": "Hide BMW's recording pop-up for these saves (needs the patched Drive Recorder)",
+      "type": "bool",
+      "default": true,
+      "hud": false
+    },
+    {
+      "key": "usb",
+      "label": "Copy every clip to the USB stick",
+      "type": "bool",
+      "default": false,
+      "hudLabel": "Copy to USB"
+    },
+    {
+      "key": "usbKeepGb",
+      "label": "Keep on the stick at most",
+      "type": "number",
+      "unit": "GB",
+      "default": 50,
+      "min": 4,
+      "max": 240,
+      "step": 2
+    },
+    {
+      "key": "keep",
+      "label": "Keep clips on the car (needs the clip keeper)",
+      "hudLabel": "Keep clips on car",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "keepGb",
+      "label": "Keep on the car at most (8 GB is about an hour)",
+      "type": "number",
+      "unit": "GB",
+      "default": 10,
+      "min": 2,
+      "max": 24,
+      "step": 2
+    },
+    {
+      "key": "usbMove",
+      "label": "After copying a kept clip to the stick, remove it from the car",
+      "type": "bool",
+      "default": true,
+      "hud": false
+    },
+    {
+      "key": "clearKept",
+      "label": "Delete the clips kept on the car (switch on twice within 15 s)",
+      "type": "bool",
+      "default": false,
+      "hud": false
+    }
+  ]
+}

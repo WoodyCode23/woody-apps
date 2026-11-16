@@ -1,0 +1,21 @@
+{
+  "id": "woodr-dashkeep",
+  "kind": "tool",
+  "version": "0.2.0",
+  "title": "Dashcam clip keeper",
+  "description": "Keeps the dash cam's clips on the car after the stock recorder has dropped them (hard links, no copies; oldest out first). Used by the Dashcam app.",
+  "mguHmi": ["ID7"],
+  "optional": true,
+  "uninstallable": true,
+  "files": [
+    { "path": "keeper.js", "mode": "0644" }
+  ],
+  "units": [
+    { "name": "woodr-dashkeep.service" }
+  ],
+  "enable": [
+    { "unit": "woodr-dashkeep.service", "target": "oapcontroller.service" }
+  ],
+  "restart": ["woodr-dashkeep.service"],
+  "keepRunning": true
+}

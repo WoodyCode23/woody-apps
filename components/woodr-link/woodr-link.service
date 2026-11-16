@@ -1,0 +1,23 @@
+# Tailscale's daemon for Woody Link (components/woodr-link). Userspace networking: no tun device, no change to the
+# head unit's routes, firewall or DNS, and no proxy, so nothing on the head unit can reach the tailnet through it.
+# What it may do is held to the car policy by woodr-link-helper.service (helper.js).
+[Unit]
+Description=Woody Link: Tailscale daemon (userspace, shields up)
+After=network.target
+RequiresMountsFor=/var/opt
+ConditionPathExists=/var/opt/woodr-link/bin/tailscaled
+
+[Service]
+User=root
+RuntimeDirectory=woodr-link
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+ExecStart=/var/opt/woodr-link/bin/tailscaled --tun=userspace-networking --statedir=/var/opt/woodr-link/state --socket=/run/woodr-link/tailscaled.sock --no-logs-no-support
+Restart=on-failure
+RestartSec=10
+Nice=10
+MemoryMax=160M
+TimeoutStopSec=5
+
+[Install]
+WantedBy=oapcontroller.service

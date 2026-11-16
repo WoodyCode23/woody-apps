@@ -1,0 +1,18 @@
+# The helper apps talk to (helper.js): four requests, and the car policy put back whenever it differs.
+[Unit]
+Description=Woody Link: helper (status, connect, disconnect, logout)
+After=woodr-link.service
+Requires=woodr-link.service
+PartOf=woodr-link.service
+
+[Service]
+User=root
+ExecStart=/usr/bin/env node /var/opt/woodr-link/current/helper.js
+Restart=always
+RestartSec=5
+Nice=10
+MemoryMax=48M
+TimeoutStopSec=5
+
+[Install]
+WantedBy=oapcontroller.service
