@@ -156,7 +156,7 @@ copied from Warm-Up HUD. The app flags a tyre 0.2 bar (3 psi) or more under the 
 
 A signal declared with a getter the car lacks stops the install. Copied character for character:
 
-- From `apps/woodr_live/app.json` (known good on the car): `CDS` (`statusEngineTemperature`,
+- From `apps/woodr_live/app.json` (known good on the car; that app was retired on 2026-11-16, the file is in the history): `CDS` (`statusEngineTemperature`,
   `statusEngineSpeed2`, `statusBattery2`), `Vehicle2.statusCarSpeed2`, `VehicleInformation`
   (`statusGearboxDrive`, `DataPowerTrain2`, optional).
 - From `apps/woodr_warmhud/app.json` (version 0.6.8 is installed on the car with these): the diagnostic

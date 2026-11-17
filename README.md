@@ -10,10 +10,20 @@ Apps for a 2022 BMW G80 M3 (iDrive 7 / MGU), installed over Wi-Fi from the
 | `woodr_hud` | HUD: a menu on the head-up display worked from the steering wheel, a rev bar with a shift point, and the song that is playing |
 | `woodr_diag` | Diagnostics: fault memory and live values, read-only |
 | `woodr_link` | Link: the car on your own Tailscale network, locked down |
-| `woodr_warmhud` | Warm-up on the head-up display: oil, then the gearbox, then it turns itself off |
-| `woodr_screenlab` | Calibration grids for the HUD and instrument cluster, with BMW's keep-out areas |
+| `woodr_warmhud` | Warm-Up HUD: warm-up on the head-up display (oil, then the gearbox, then the tyres), then it turns itself off. With HUD, the rev bar's red starts lower while the oil is cold |
+| `woodr_ambient` | Ambient Studio: your ambient light, built on the car's own colours and brightness |
 | `woodr_hass` | Home Assistant, both ways, through [Car Relay](https://github.com/WoodyCode23/car-relay): your own tiles on the centre screen (doors, locks, lights, scenes, any service you choose), the doorbell camera on the cluster, and the car's readings as sensors in Home Assistant. Set up by scanning a QR with your phone; no Home Assistant token on the car |
-| `woodr_vitals` | Small warm-up / drivetrain readout (the first app; mostly superseded) |
+
+Developer tools, for working on the car and on apps:
+
+| App | What it does |
+|---|---|
+| `woodr_screenlab` | Screen Lab: calibration grids for the HUD, instrument cluster and centre screen, with BMW's keep-out areas |
+| `woodr_inputlab` | Input Lab: which steering-wheel, stalk, console and gesture inputs the head unit sees, live |
+| `woodr_devhud` | Dev HUD: progress on the head-up display while you work on the car (Store installs, the battery's charge, the network) |
+| `woodr_drivelog` | Drive Log: a second-by-second record of every drive, to line up with the dash cam or a tune |
+
+Retired on 2026-11-16 and still in the history: `woodr_vitals` and `woodr_live` (Warm-Up HUD, HUD and Diagnostics cover them) and `woodr_ambientlab` (Ambient Studio is what it became).
 
 ## Install
 MGU Store → Settings → Add source → `WoodyCode23/woody-apps` → channel `branch:main` → Check now.
