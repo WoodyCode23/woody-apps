@@ -43,10 +43,11 @@ check('the file is written whole, readable only by the app', () => {
     assert.deepStrictEqual(fs.readdirSync(dir), ['relay.json'], 'no temporary file left');
     if (process.platform !== 'win32') assert.strictEqual(fs.statSync(path.join(dir, 'relay.json')).mode & 0o777, 0o600);
 });
-check('the car\'s addresses: hotspot and home Wi-Fi first, never loopback, link-local or the VPN first', () => {
+check('the car\'s addresses: the wireless CarPlay side first, then hotspot and home Wi-Fi, never loopback, link-local or the VPN first', () => {
     const got = S.addresses({ lo: [{ family: 'IPv4', address: '127.0.0.1', internal: true }], eth0: [{ family: 'IPv4', address: '169.254.10.2' }],
-        tailscale0: [{ family: 'IPv4', address: '100.101.1.2' }], wlan0: [{ family: 'IPv4', address: '172.20.10.4' }, { family: 'IPv6', address: 'fe80::1' }], wlan1: [{ family: 4, address: '192.168.68.40' }] });
-    assert.deepStrictEqual(got.map((a) => a.address), ['172.20.10.4', '192.168.68.40', '100.101.1.2']);
+        tailscale0: [{ family: 'IPv4', address: '100.101.1.2' }], wlan0: [{ family: 'IPv4', address: '172.20.10.4' }, { family: 'IPv6', address: 'fe80::1' }], wlan1: [{ family: 4, address: '192.168.68.40' }], wlan_bridge: [{ family: 'IPv4', address: '172.16.222.97' }] });
+    assert.deepStrictEqual(got.map((a) => a.address), ['172.16.222.97', '172.20.10.4', '192.168.68.40', '100.101.1.2']);
+    assert.strictEqual(got[0].rank, 0); assert(got.slice(1).every((a) => a.rank > 0));
 });
 check('the keyboard: keys, words, delete, clear, and a length it will not pass', () => {
     assert.strictEqual(S.KEYS.join('').length, 40);
@@ -73,7 +74,7 @@ function req(port, method, p, body) {
 }
 function setup(extra) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hass-setup-'));
-    const s = new S.Setup(dir, null, Object.assign({ host: '127.0.0.1', ports: [0], ifaces: { wlan0: [{ family: 'IPv4', address: '172.20.10.4' }] } }, extra || {}));
+    const s = new S.Setup(dir, null, Object.assign({ host: '127.0.0.1', ports: [0], ifaces: { wlan_bridge: [{ family: 'IPv4', address: '172.16.222.97' }] } }, extra || {}));
     return { s: s, dir: dir };
 }
 check('the phone page: the form with the right code, saved, and then closed', () => {
@@ -83,7 +84,7 @@ check('the phone page: the form with the right code, saved, and then closed', ()
     return s.start().then((ok) => {
         assert(ok && s.state === 'open');
         const link = s.links()[0].url;
-        assert(new RegExp('^http://172\\.20\\.10\\.4:' + s.port + '/s/[A-Z2-9]{8}$').test(link), link);
+        assert(new RegExp('^http://172\\.16\\.222\\.97:' + s.port + '/s/[A-Z2-9]{8}$').test(link), link);
         const p = '/s/' + s.code;
         return req(s.port, 'GET', p).then((r) => {
             assert.strictEqual(r.status, 200);
@@ -169,7 +170,17 @@ check('the pairing token goes only to the address that issued it', () => {
     r = new Relay(dir, quiet); r.load();
     assert.strictEqual(r.token, 'dev1.secret', 'back at its own address it works again');
 });
-check('the phone page listens on one network only: the hotspot or Wi-Fi it shows, never a VPN or every interface', () => {
+check('with the phone only on home Wi-Fi or its own hotspot there is no page (nothing can get in there): the keyboard', () => {
+    const s = new S.Setup(fs.mkdtempSync(path.join(os.tmpdir(), 'hass-setup-')), null, { ports: [0], ifaces: { wlan0: [{ family: 'IPv4', address: '192.168.68.40' }], wlan1: [{ family: 'IPv4', address: '172.20.10.4' }] } });
+    return s.start().then((ok) => { assert.strictEqual(ok, false); assert.strictEqual(s.state, 'failed'); assert.strictEqual(s.why, 'no phone link'); assert.deepStrictEqual(s.links(), []); });
+});
+check('the page is offered on the ports the car lets in from a phone, and the link names the car\'s address there', () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'apps', 'woodr_hass', 'setup.js'), 'utf8');
+    assert(/const PORTS = \[9877, 9874, 9871\];/.test(src));
+    const { s } = setup();
+    return s.start().then((ok) => { assert.strictEqual(ok, true); assert(/^http:\/\/172\.16\.222\.97:\d+\/s\/[A-Za-z0-9]+$/.test(s.links()[0].url), s.links()[0].url); s.stop(); });
+});
+check('the phone page listens on one network only: the one it shows, never a VPN or every interface', () => {
     const s = new S.Setup(fs.mkdtempSync(path.join(os.tmpdir(), 'hass-setup-')), null, { ports: [0],
         ifaces: { tailscale0: [{ family: 'IPv4', address: '100.101.1.2' }], lo: [{ family: 'IPv4', address: '127.0.0.1', internal: true }] } });
     return s.start().then((ok) => {

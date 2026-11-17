@@ -12,7 +12,7 @@ Apps for a 2022 BMW G80 M3 (iDrive 7 / MGU), installed over Wi-Fi from the
 | `woodr_link` | Link: the car on your own Tailscale network, locked down |
 | `woodr_warmhud` | Warm-Up HUD: warm-up on the head-up display (oil, then the gearbox, then the tyres), then it turns itself off. With HUD, the rev bar's red starts lower while the oil is cold |
 | `woodr_ambient` | Ambient Studio: your ambient light, built on the car's own colours and brightness |
-| `woodr_hass` | Home Assistant, both ways, through [Car Relay](https://github.com/WoodyCode23/car-relay): your own tiles on the centre screen (doors, locks, lights, scenes, any service you choose), the doorbell camera on the cluster, and the car's readings as sensors in Home Assistant. The house address is typed on the car's screen and the car is paired by scanning a QR with your phone; no Home Assistant token on the car |
+| `woodr_hass` | Home Assistant, both ways, through [Car Relay](https://github.com/WoodyCode23/car-relay): your own tiles on the centre screen (doors, locks, lights, scenes, any service you choose), the doorbell camera on the cluster, and the car's readings as sensors in Home Assistant. Set up from your phone by QR while it is on wireless CarPlay, or on the car's own keyboard; no Home Assistant token on the car |
 
 Developer tools, for working on the car and on apps:
 

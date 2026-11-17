@@ -389,7 +389,7 @@ mgu.run({
         function drawSetupPhone(cv, t) {
             const links = setup.links();
             if (setup.state === 'starting' || (!links.length && setup.state === 'open')) {
-                cv.text(setup.state === 'starting' ? 'Getting ready...' : 'This car is not on a network your phone can reach', 80, 200, 30, t.text, { font: 'bold' });
+                cv.text(setup.state === 'starting' ? 'Getting ready...' : 'Connect your phone by wireless CarPlay, or use the keyboard', 80, 200, 30, t.text, { font: 'bold' });
                 cv.text('Turn on your phone\'s hotspot and connect the car to it, or use the keyboard.', 80, 250, 24, t.dim);
             } else if (links.length) {
                 drawQr(cv, links[0].url, 80, 92, 360);

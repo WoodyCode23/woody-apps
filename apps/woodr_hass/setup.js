@@ -38,7 +38,12 @@ const http = require('http');
 const crypto = require('crypto');
 const EventEmitter = require('events');
 
-const PORTS = [8791, 8792, 0];
+/* Where a phone can reach a page on the car (found on the car, 2026-11-17): only on the car's own Wi-Fi side,
+ * the one a phone joins for wireless CarPlay (interface wlan_bridge), and only on a few ports the car's firewall
+ * lets in from there. These three were open and unused. On the home Wi-Fi or a phone's hotspot the head unit
+ * accepts nothing incoming at all, so no page is offered there and the on-screen keyboard is used. */
+const BRIDGE = 'wlan_bridge';
+const PORTS = [9877, 9874, 9871];
 const OPEN_MS = 10 * 60 * 1000;
 const MAX_TRIES = 5;
 const MAX_BODY = 2048;
@@ -82,14 +87,14 @@ function save(dataDir, base, name) {
     return { base: base, name: String(name || 'Car').slice(0, 40) };
 }
 
-/** The car's own addresses on its networks, best guess first: a phone hotspot or a home Wi-Fi, never loopback or link-local. */
+/** The car's own addresses on its networks, the one a phone can reach first (rank 0: the wireless CarPlay side), never loopback or link-local. */
 function addresses(ifaces) {
     const out = [];
     const all = ifaces || os.networkInterfaces();
     Object.keys(all).forEach((name) => (all[name] || []).forEach((a) => {
         const v4 = a && (a.family === 'IPv4' || a.family === 4);
         if (!v4 || a.internal || /^127\.|^169\.254\./.test(a.address)) return;
-        const rank = /^172\.20\.10\./.test(a.address) ? 0 : /^192\.168\./.test(a.address) ? 1 : /^10\./.test(a.address) ? 2 : /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address) ? 9 : 3;
+        const rank = name === BRIDGE ? 0 : /^172\.20\.10\./.test(a.address) ? 1 : /^192\.168\./.test(a.address) ? 2 : /^10\./.test(a.address) ? 3 : /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address) ? 9 : 4;
         out.push({ address: a.address, iface: name, rank: rank });
     }));
     return out.sort((x, y) => x.rank - y.rank);
@@ -127,11 +132,11 @@ class Setup extends EventEmitter {
         this.code = code(8); this.tries = 0; this.why = ''; this.state = 'starting';
         this.until = Date.now() + (this.opts.openMs || OPEN_MS);
         const ports = this.opts.ports || PORTS;
-        /* one network only: the car's best address that is not a VPN (a phone hotspot, else Wi-Fi), never all of them */
-        const best = addresses(this.opts.ifaces).filter((a) => a.rank < 9)[0];
+        /* one network only, and only the one a phone can get in on: the car's wireless CarPlay side */
+        const best = addresses(this.opts.ifaces).filter((a) => a.rank === 0)[0];
         this.host = this.opts.host || (best && best.address) || '';
         this.hostShown = (best && best.address) || '';
-        if (!this.host) { this.state = 'failed'; this.why = 'no network'; this.log.warn('setup: the car is on no network a phone can reach: the on-screen keyboard it is'); this.emit('change'); return Promise.resolve(false); }
+        if (!this.host) { this.state = 'failed'; this.why = 'no phone link'; this.log.warn('setup: no phone is on the car\'s own Wi-Fi (wireless CarPlay): the on-screen keyboard it is'); this.emit('change'); return Promise.resolve(false); }
         const tryPort = (i) => new Promise((resolve) => {
             if (i >= ports.length) { resolve(false); return; }
             const srv = http.createServer((req, res) => { try { this._serve(req, res); } catch (e) { try { res.statusCode = 500; res.end(); } catch (x) { /* gone */ } } });
