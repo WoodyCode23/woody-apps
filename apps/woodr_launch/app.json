@@ -2,7 +2,7 @@
   "id": "woodr_launch",
   "title": "Launch",
   "description": "A drag-strip style launch timer: staging, a countdown tree, and a full timeslip (reaction, 60 ft to 1 mile, 0-60, 60-130 and more) with a history of your runs and a data log of each one (speed, revs, gear, pull, an estimate of wheelspin). The tree and the run also show on the instrument cluster and the head-up display. It only measures: it arms and changes nothing on the car. Closed courses and private land only.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "vendor": "custom",
   "loggingId": "OAB4",
   "iconGlyph": "live_data",
@@ -197,6 +197,13 @@
       "type": "bool",
       "default": true,
       "hudLabel": "Highlight launches"
+    },
+    {
+      "key": "usbRuns",
+      "label": "Share each run's data log with Dashcam, which copies it to its USB stick",
+      "type": "bool",
+      "default": true,
+      "hudLabel": "Run logs to USB"
     },
     {
       "key": "demo",

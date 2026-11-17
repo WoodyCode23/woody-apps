@@ -86,6 +86,14 @@ mgu.run({
         const runlog = new RL.RunLog(path.join(ctx.dataDir, 'runs'));
         try { hist.load(); log.info('launch: ' + hist.runs.length + ' saved run(s)'); } catch (e) { log.warn('history: ' + e); }
         const remote = new Remote(ctx, APP_ID);
+        /* the newest run logs where Dashcam can take them to its USB stick, beside the clips (its runlogs.js) */
+        const shareRuns = () => {
+            if (settings.get('usbRuns') === false) return;
+            shared.write('launch.runs.json', { dir: 'launch.runs' });          /* also makes the shared folder */
+            const n = runlog.publish(path.join(shared.DIR, 'launch.runs'), RL.SHARE);
+            if (n < 0) log.warn('launch: run logs not shared: ' + runlog.error);
+        };
+        try { shareRuns(); } catch (e) { log.warn('launch: share runs: ' + e); }
 
         /* what the car last said, and what the app is showing */
         const st = {
@@ -242,7 +250,7 @@ mgu.run({
                 if (demo || res.aborted) runlog.cancel();
                 else {
                     logged = runlog.finish({ at: new Date(Date.now() - Math.max(0, now() - timer.tGreen)).toISOString(), greenMs: timer.tGreen, moveMs: timer.tMove, rollout: !!timer.rollout, red: !!res.red, et: rec.et, end: res.end });
-                    if (logged) { rec.log = logged.file; rec.sum = logged.summary; log.info('launch: data log ' + logged.file + ' ' + JSON.stringify(logged.summary)); }
+                    if (logged) { shareRuns(); rec.log = logged.file; rec.sum = logged.summary; log.info('launch: data log ' + logged.file + ' ' + JSON.stringify(logged.summary)); }
                     else log.warn('launch: no data log' + (runlog.error ? ': ' + runlog.error : ''));
                 }
             } catch (e) { log.warn('launch: data log: ' + e); }

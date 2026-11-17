@@ -2,7 +2,7 @@
   "id": "woodr_dashcam",
   "title": "Dashcam",
   "description": "BMW's drive recorder as a loop dash cam: while driving it keeps saving clips of all cameras and copies each one to a USB stick, oldest clips making room. A lab view shows the video buffer live and times every save. Needs BMW's Drive Recorder switched on.",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "vendor": "custom",
   "loggingId": "OAAF",
   "iconGlyph": "live_data",

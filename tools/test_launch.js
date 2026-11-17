@@ -813,7 +813,7 @@ check('launches are marked on the dashcam: Launch writes its own request file, a
 });
 check('app.json: version, logging id, required signals only where another installed app already requires them', () => {
     const spec = JSON.parse(fs.readFileSync(path.join(APP, 'app.json'), 'utf8'));
-    assert.strictEqual(spec.id, 'woodr_launch'); assert.strictEqual(spec.title, 'Launch'); assert.strictEqual(spec.version, '0.7.0'); assert.strictEqual(spec.loggingId, 'OAB4');
+    assert.strictEqual(spec.id, 'woodr_launch'); assert.strictEqual(spec.title, 'Launch'); assert.strictEqual(spec.version, '0.7.1'); assert.strictEqual(spec.loggingId, 'OAB4');
     const required = [];
     Object.keys(spec.signals).forEach((i) => { if (!spec.signals[i]._optional) Object.keys(spec.signals[i]).forEach((f) => { if (/r/.test(spec.signals[i][f])) required.push(i.split('.').pop() + '.' + f); }); });
     assert.deepStrictEqual(required.sort(), ['CDS.statusEngineSpeed2', 'Vehicle2.statusCarSpeed2']);

@@ -25,6 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const SHARE = 10;                /* run logs left where Dashcam can take them to its USB stick */
 const KEEP = 20;                 /* run files kept */
 const MAX_ROWS = 1600;           /* 64 s at one row every STEP_MS: longer than any run the timer allows */
 const STEP_MS = 40;
@@ -108,6 +109,29 @@ class RunLog {
         } catch (e) { this.error = String(e && e.message || e); return null; }
         return { file: file, summary: summary };
     }
+
+    /**
+     * Copies of the newest `n` run logs in `outDir` (a folder other apps can read), and none older: Dashcam takes
+     * them to its USB stick. Returns how many are there, or -1 when it could not be done. Never throws.
+     */
+    publish(outDir, n) {
+        try {
+            let all;
+            try { all = fs.readdirSync(this.dir).filter((f) => /^run-[\d-]+\.json$/.test(f)).sort(); } catch (e) { all = []; }
+            const want = all.slice(-Math.max(0, n));
+            try { fs.mkdirSync(outDir); } catch (e) { if (e.code !== 'EEXIST') throw e; }
+            try { fs.chmodSync(outDir, 0o755); } catch (e) { /* best effort */ }
+            const there = fs.readdirSync(outDir);
+            there.filter((f) => want.indexOf(f) < 0).forEach((f) => { try { fs.unlinkSync(path.join(outDir, f)); } catch (e) { /* not ours, or gone */ } });
+            want.filter((f) => there.indexOf(f) < 0).forEach((f) => {
+                const tmp = path.join(outDir, f + '.tmp');
+                fs.writeFileSync(tmp, fs.readFileSync(path.join(this.dir, f)));
+                try { fs.chmodSync(tmp, 0o644); } catch (e) { /* best effort */ }
+                fs.renameSync(tmp, path.join(outDir, f));
+            });
+            return want.length;
+        } catch (e) { this.error = String(e && e.message || e); return -1; }
+    }
 }
 
 /** the summary as one line for the log and the timeslip, or '' when the car gave nothing to go on */
@@ -120,4 +144,4 @@ function line(s, unit) {
     return parts.join('  //  ');
 }
 
-module.exports = { RunLog: RunLog, analyse: analyse, line: line, KEEP: KEEP, MAX_ROWS: MAX_ROWS, STEP_MS: STEP_MS, SPIN_KMH: SPIN_KMH };
+module.exports = { SHARE: SHARE, RunLog: RunLog, analyse: analyse, line: line, KEEP: KEEP, MAX_ROWS: MAX_ROWS, STEP_MS: STEP_MS, SPIN_KMH: SPIN_KMH };

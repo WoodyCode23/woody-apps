@@ -29,6 +29,7 @@ const { withAlpha } = require('./kit/canvas');
 const { Recorder } = require('./recorder');
 const shared = require('./shared');
 const { Usb } = require('./usb');
+const runlogs = require('./runlogs');
 
 const W = 1600, H = 520;
 const CLIPS = '/var/opt/hdshare/ent/driverecorder';      /* the same folder, as this unit mounts it */
@@ -175,6 +176,19 @@ async function background(bg) {
             if (usb.queue.length >= 12) return;                                          /* the rest at the next pass */
             usb.copyClip(c.dir, c.name, (ok) => { if (ok) onStick(c.name); if (ok && kept && moveOn()) keep.drop(c.name); });
         });
+        /* Launch's run logs, beside the clips: small, so they go at once, under the same write session */
+        try {
+            const dest = path.join(usb.device.mount, runlogs.FOLDER);
+            let there = [];
+            try { there = fs.readdirSync(dest); } catch (e) { /* no folder yet */ }
+            const src = path.join(shared.DIR, 'launch.runs'), names = runlogs.pending(src, there);
+            if (names.length) {
+                usb.hold().then(() => {
+                    const r = runlogs.copyTo(src, dest, names);
+                    log.info('usb: ' + r.copied + ' run log' + (r.copied === 1 ? '' : 's') + ' from Launch copied' + (r.failed ? ', ' + r.failed + ' failed: ' + r.why : ''));
+                }).catch((e) => log.warn('usb: run logs: ' + (e && e.message || e)));
+            }
+        } catch (e) { log.warn('usb: run logs: ' + e); }
     }
     let idleSince = 0;
     const usbTimer = setInterval(() => {

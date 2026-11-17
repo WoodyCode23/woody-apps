@@ -3,6 +3,7 @@
  * shared.js - small files in /dev/shm/woody that let the Woody apps steer each other without sockets.
  *
  *   hud.json     written by HUD's menu: { warmup: 'auto' | 'hide' | 'show', at }   (Warm-Up HUD reads it)
+ *   launch.runs/ written by Launch: copies of its newest run logs                    (Dashcam copies them to its USB stick)
  *   ambient.json written by HUD's menu: { cmd: 'next', n, at }                      (Ambient Studio reads it)
  *
  * Each app runs as its own user, so the folder is 1777 (anyone writes, only a file's owner replaces it) and the
