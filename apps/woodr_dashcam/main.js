@@ -78,6 +78,15 @@ async function background(bg) {
     }, 200);
     if (loopTimer.unref) loopTimer.unref();
 
+    /* after a head-unit start BMW's recorder app is not running and the buffer stays IDLE: wake it ourselves, only
+     * with the loop on, camera commands allowed and the engine running, after 20 s of IDLE (BMW's app needs about 1 s) */
+    const wakeTimer = setInterval(() => {
+        if (!st.loop || !allowed() || settings.get('wake') === false) return;
+        /* once this app has woken it, BMW's app is not there to do it after each store: do not wait 20 s every time */
+        if (rec.canWake(rec.selfWoke ? 2500 : 20000)) rec.wake().catch(() => {});
+    }, 500);
+    if (wakeTimer.unref) wakeTimer.unref();
+
     /* ---- clips kept on the car: what the keeper is asked for, and what it reports ---- */
     /* ---- highlights: clip names kept in this app's data folder (small), pinned at the keeper ---- */
     const HL_FILE = path.join(bg.dataDir, 'highlights.json');

@@ -17,10 +17,17 @@
  *
  * After a store the buffer goes IDLE and BMW's app starts it again (activation sequence), so back-to-back clips
  * may have a gap: this module times every state change so the loop can be tuned to the car.
+ *
+ * BMW's app is started by hand (appStartType "manually"), so after a head-unit start nothing starts the buffer
+ * until someone opens it. wake() is its activation sequence, read from its code (7.87.0): attach, cameras to
+ * DR_STANDBY, startRecording. Like BMW's it runs only with the engine running, and only when the buffer has
+ * stayed IDLE far longer than BMW's app would leave it.
  */
 const EventEmitter = require('events');
 
 const VB = 'de.bmw.infotainment.video.videobuffer.VideoBuffer';
+const CDS = 'de.bmw.infotainment.vehicle.CDS';
+const RPM_INVALID = 65535, RPM_FACTOR = 0.25, RPM_RUNNING = 400;
 const ICAM = 'de.bmw.infotainment.video.cameraproxy.ICAM2Proxy';
 const STATUS = { 0: 'IDLE', 1: 'ERROR', 2: 'RECORDING', 3: 'STORING' };
 const APPS = { 0: 'OFF', 1: 'TOPREARVIEW', 2: 'SIDEVIEW', 3: 'RFK', 20: 'OFFROAD', 50: 'DR_STANDBY', 51: 'DR_ACTIVE', 52: 'DR_CRASH', 60: 'REMOTE360', 255: 'SIGNAL_UNFILLED' };
@@ -44,6 +51,7 @@ class Recorder extends EventEmitter {
         this.timeline = [];                /* { at, what } newest last, the last 60 */
         this.saves = 0; this.lastSaveAt = 0; this.lastStoreMs = null; this.lastGapMs = null;
         this._storingFrom = 0; this._idleFrom = 0;
+        this.rpm = null; this.wakes = 0; this.lastWakeAt = 0; this._waking = false;
     }
 
     _mark(what) {
@@ -68,6 +76,12 @@ class Recorder extends EventEmitter {
         }, this.log);
         this.icam = b && b.proxy;
         if (b && b.error) this.error = (this.error ? this.error + '; ' : '') + 'camera proxy: ' + b.error;
+        /* engine speed, only to know the engine runs before waking the buffer; without it the buffer is never woken */
+        try {
+            await this.signals.watch(CDS, '1', {
+                statusEngineSpeed2: (v) => { const raw = v && v.actualValueRPMEngineCrankshaft; this.rpm = typeof raw === 'number' && raw !== RPM_INVALID ? raw * RPM_FACTOR : null; },
+            }, this.log);
+        } catch (e) { /* optional */ }
         return !!this.vb;
     }
 
@@ -81,6 +95,7 @@ class Recorder extends EventEmitter {
         if (was === 'STORING' && s !== 'ERROR' && this.lastBase) { const b = this.lastBase; this.lastBase = null; setTimeout(() => this.emit('stored', b), 1500); }
         /* the real gap: from the store's end (IDLE) to the buffer recording again */
         if (s === 'RECORDING' && this._idleFrom) { this.lastGapMs = now - this._idleFrom; this._idleFrom = 0; }
+        if (s === 'RECORDING') this.wakes = 0;
         this.status = s; this.since = now;
         this._mark(was + ' -> ' + s + (s === 'RECORDING' && this.lastGapMs !== null ? ' (not buffering for ' + (this.lastGapMs / 1000).toFixed(1) + ' s)' : '')
             + (was === 'STORING' && this.lastStoreMs !== null ? ' (store took ' + (this.lastStoreMs / 1000).toFixed(1) + ' s)' : ''));
@@ -113,6 +128,36 @@ class Recorder extends EventEmitter {
         this.saves++; this.lastSaveAt = Date.now(); this.lastBase = base;
         this._mark('store ' + past + '+' + future + ' s -> ' + base + (o.active === false ? ' (buffer only)' : ''));
         return base;
+    }
+
+    /** true when the buffer may be woken: engine running, buffer IDLE for `idleMs`, cameras known, not tried lately */
+    canWake(idleMs) {
+        const now = Date.now();
+        return !!this.vb && !!this.icam && !this._waking && this.status === 'IDLE' && now - this.since >= idleMs
+            && typeof this.rpm === 'number' && this.rpm >= RPM_RUNNING
+            && now - this.lastWakeAt >= 15000 && this.wakes < 10
+            && !(this.icamState && this.icamState.application === 'SIGNAL_UNFILLED');
+    }
+
+    /** BMW's activation sequence: attach, cameras to DR_STANDBY, start the buffer. One try; the caller paces it. */
+    async wake() {
+        if (this._waking) return false;
+        this._waking = true; this.lastWakeAt = Date.now(); this.wakes++;
+        try {
+            await this._attach();
+            if (this.cookie === -1) throw new Error('no camera client');
+            const persp = this.icamState && typeof this.icamState.perspective === 'number' ? this.icamState.perspective : ALL_CAMERAS;
+            if (!(this.icamState && this.icamState.application === 'DR_STANDBY')) {
+                await this.signals.call(this.icam, 'changeState', { cookie: this.cookie, desiredState: { application: 'DR_STANDBY', mode: 'MODE_MOSAIK', perspective: persp } }, 5000);
+            }
+            if (this.status === 'IDLE') await this.signals.call(this.vb, 'startRecording', {}, 5000);
+            this.selfWoke = true;
+            this._mark('buffer woken (try ' + this.wakes + ')');
+            return true;
+        } catch (e) {
+            this.log.warn('dashcam: wake failed: ' + String(e && e.message || e));
+            return false;
+        } finally { this._waking = false; }
     }
 
     async stop() {

@@ -2,7 +2,7 @@
   "id": "woodr_dashcam",
   "title": "Dashcam",
   "description": "BMW's drive recorder as a loop dash cam: while driving it keeps saving clips of all cameras and copies each one to a USB stick, oldest clips making room. A lab view shows the video buffer live and times every save. Needs BMW's Drive Recorder switched on.",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "vendor": "custom",
   "loggingId": "OAAF",
   "iconGlyph": "live_data",
@@ -17,8 +17,13 @@
       "currentStatus": "rs",
       "currentConfiguration": "rs",
       "_methods": [
-        "storeVideo"
+        "storeVideo",
+        "startRecording"
       ]
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "_optional": "engine speed: without it the app never starts the car's video buffer itself",
+      "statusEngineSpeed2": "s"
     },
     "de.bmw.infotainment.video.cameraproxy.ICAM2Proxy": {
       "_optional": "the camera proxy, switched to DR_ACTIVE before a save as BMW's app does",
@@ -80,6 +85,12 @@
       "type": "bool",
       "default": false,
       "hudLabel": "Loop recording"
+    },
+    {
+      "key": "wake",
+      "label": "Start the car's recorder by itself after a restart",
+      "type": "bool",
+      "default": true
     },
     {
       "key": "past",
