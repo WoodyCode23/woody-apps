@@ -27,6 +27,20 @@ ok('the newest ten are shared, whole, and nothing else', rl.publish(shm, RL.SHAR
     && fs.readFileSync(path.join(shm, name(14)), 'utf8') === '{"v":1,"n":14}');
 fs.writeFileSync(path.join(runs, name(15)), '{"v":1,"n":15}');
 ok('a new run: it is added and the oldest shared one goes', rl.publish(shm, RL.SHARE) === 10 && ls(shm)[0] === name(6) && ls(shm)[9] === name(15) && ls(shm).every((n) => !/\.tmp$/.test(n)));
+/* the shared folder is one any app can write to: a planted link or file there must not steer Launch */
+(() => {
+    const victim = mk(path.join(root, 'victim')); fs.writeFileSync(path.join(victim, name(1)), 'precious'); fs.writeFileSync(path.join(victim, 'other.txt'), 'precious');
+    const trap = path.join(root, 'trap');
+    let linked = false;
+    try { fs.symlinkSync(victim, trap, 'junction'); linked = true; } catch (e) { /* links not allowed on this PC */ }
+    if (linked) ok('a link planted where the shared folder should be: nothing written or removed through it', new RL.RunLog(runs).publish(trap, RL.SHARE) === -1 && ls(victim).join() === name(1) + ',other.txt' && fs.readFileSync(path.join(victim, name(1)), 'utf8') === 'precious');
+    else console.log('ok   (planted-link case skipped: this PC does not allow links)');
+    const asFile = path.join(root, 'asfile'); fs.writeFileSync(asFile, 'x');
+    ok('a file planted where the shared folder should be: refused', new RL.RunLog(runs).publish(asFile, RL.SHARE) === -1 && fs.readFileSync(asFile, 'utf8') === 'x');
+    fs.writeFileSync(path.join(shm, 'someone-elses.txt'), 'keep'); fs.writeFileSync(path.join(shm, name(15) + '.tmp'), 'stale');
+    ok('inside it: other names are left alone, a stale temporary file is cleared', rl.publish(shm, RL.SHARE) === 10 && fs.readFileSync(path.join(shm, 'someone-elses.txt'), 'utf8') === 'keep' && !fs.existsSync(path.join(shm, name(15) + '.tmp')));
+    fs.unlinkSync(path.join(shm, 'someone-elses.txt'));
+})();
 ok('a shared folder that cannot be made: said, not thrown', new RL.RunLog(runs).publish(path.join(root, 'no', 'such', 'place'), 10) === -1);
 
 /* ---- Dashcam's side */

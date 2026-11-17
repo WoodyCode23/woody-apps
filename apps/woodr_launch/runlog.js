@@ -113,35 +113,35 @@ class RunLog {
     /**
      * Copies of the newest `n` run logs in `outDir` (a folder other apps can read), and none older: Dashcam takes
      * them to its USB stick. Returns how many are there, or -1 when it could not be done. Never throws.
+     *
+     * outDir sits in a folder every app on the unit can write to, so it is not taken on trust: it must be a real
+     * folder (not a link) that this app owns, or nothing is written or removed. Inside it only this app's own
+     * regular files with a run log's name are removed, and a file is created new, never through a link.
      */
     publish(outDir, n) {
         try {
+            const RUN = /^run-[\d-]+\.json$/, C = fs.constants || {};
             let all;
-            try { all = fs.readdirSync(this.dir).filter((f) => /^run-[\d-]+\.json$/.test(f)).sort(); } catch (e) { all = []; }
+            try { all = fs.readdirSync(this.dir).filter((f) => RUN.test(f)).sort(); } catch (e) { all = []; }
             const want = all.slice(-Math.max(0, n));
-            try { fs.mkdirSync(outDir); } catch (e) { if (e.code !== 'EEXIST') throw e; }
+            try { fs.mkdirSync(outDir, 0o755); } catch (e) { if (e.code !== 'EEXIST') throw e; }
+            const me = typeof process.getuid === 'function' ? process.getuid() : null;
+            const dst = fs.lstatSync(outDir);
+            if (!dst.isDirectory() || dst.isSymbolicLink() || (me !== null && dst.uid !== me)) throw new Error('the shared folder is not this app\'s own');
             try { fs.chmodSync(outDir, 0o755); } catch (e) { /* best effort */ }
+            const mine = (f) => { try { const s = fs.lstatSync(path.join(outDir, f)); return s.isFile() && (me === null || s.uid === me); } catch (e) { return false; } };
             const there = fs.readdirSync(outDir);
-            there.filter((f) => want.indexOf(f) < 0).forEach((f) => { try { fs.unlinkSync(path.join(outDir, f)); } catch (e) { /* not ours, or gone */ } });
-            want.filter((f) => there.indexOf(f) < 0).forEach((f) => {
-                const tmp = path.join(outDir, f + '.tmp');
-                fs.writeFileSync(tmp, fs.readFileSync(path.join(this.dir, f)));
-                try { fs.chmodSync(tmp, 0o644); } catch (e) { /* best effort */ }
+            /* out with what is no longer wanted, and with any temporary file a stopped copy left behind */
+            there.filter((f) => (RUN.test(f) && want.indexOf(f) < 0) || /^run-[\d-]+\.json\.tmp$/.test(f)).forEach((f) => { if (mine(f)) { try { fs.unlinkSync(path.join(outDir, f)); } catch (e) { /* gone */ } } });
+            want.filter((f) => there.indexOf(f) < 0 || !mine(f)).forEach((f) => {
+                const data = fs.readFileSync(path.join(this.dir, f)), tmp = path.join(outDir, f + '.tmp');
+                const fd = fs.openSync(tmp, (C.O_WRONLY || 1) | (C.O_CREAT || 0) | (C.O_EXCL || 0) | (C.O_NOFOLLOW || 0), 0o644);
+                try { fs.writeSync(fd, data, 0, data.length); } finally { fs.closeSync(fd); }
                 fs.renameSync(tmp, path.join(outDir, f));
             });
             return want.length;
         } catch (e) { this.error = String(e && e.message || e); return -1; }
     }
-}
-
-/** the summary as one line for the log and the timeslip, or '' when the car gave nothing to go on */
-function line(s, unit) {
-    if (!s) return '';
-    const parts = [];
-    if (num(s.peakG)) parts.push('PEAK ' + s.peakG.toFixed(2) + ' G');
-    if (num(s.spinKmh)) parts.push(s.spinKmh >= SPIN_KMH ? 'WHEELSPIN EST ' + (unit === 'kmh' ? s.spinKmh.toFixed(0) + ' KM/H' : (s.spinKmh / 1.609344).toFixed(0) + ' MPH') + ' AT ' + s.spinAtS.toFixed(1) + ' S' : 'NO WHEELSPIN SEEN');
-    if (num(s.launchRpm)) parts.push('LEFT AT ' + Math.round(s.launchRpm / 10) * 10 + ' RPM');
-    return parts.join('  //  ');
 }
 
 module.exports = { SHARE: SHARE, RunLog: RunLog, analyse: analyse, line: line, KEEP: KEEP, MAX_ROWS: MAX_ROWS, STEP_MS: STEP_MS, SPIN_KMH: SPIN_KMH };
