@@ -33,7 +33,7 @@ ok('a new run: it is added and the oldest shared one goes', rl.publish(shm, RL.S
     const trap = path.join(root, 'trap');
     let linked = false;
     try { fs.symlinkSync(victim, trap, 'junction'); linked = true; } catch (e) { /* links not allowed on this PC */ }
-    if (linked) ok('a link planted where the shared folder should be: nothing written or removed through it', new RL.RunLog(runs).publish(trap, RL.SHARE) === -1 && ls(victim).join() === name(1) + ',other.txt' && fs.readFileSync(path.join(victim, name(1)), 'utf8') === 'precious');
+    if (linked) ok('a link planted where the shared folder should be: nothing written or removed through it', new RL.RunLog(runs).publish(trap, RL.SHARE) === -1 && ls(victim).join() === 'other.txt,' + name(1) && fs.readFileSync(path.join(victim, name(1)), 'utf8') === 'precious');
     else console.log('ok   (planted-link case skipped: this PC does not allow links)');
     const asFile = path.join(root, 'asfile'); fs.writeFileSync(asFile, 'x');
     ok('a file planted where the shared folder should be: refused', new RL.RunLog(runs).publish(asFile, RL.SHARE) === -1 && fs.readFileSync(asFile, 'utf8') === 'x');
@@ -66,6 +66,10 @@ const d2 = path.join(stick, 'L2');
 r = D.copyTo(evil, d2, ['run-2026-11-17-10-00-00.json', '../escape.json', 'passwd', 'run-2026-11-17-11-00-00.json', 'run-2026-11-17-99-00-00.json']);
 ok('copyTo checks again by itself: odd names are ignored, a too-large or missing file fails and the rest go', r.copied === 1 && r.failed === 2 && ls(d2).join() === 'run-2026-11-17-10-00-00.json' && !fs.existsSync(path.join(stick, 'escape.json')));
 for (let i = 0; i < 30; i++) fs.writeFileSync(path.join(evil, 'run-2026-10-' + (10 + (i % 20)) + '-10-00-' + (i < 10 ? '0' : '') + i + '.json'), '{}');
+if (process.platform !== 'win32') {
+    const loose = mk(path.join(root, 'loose')); fs.writeFileSync(path.join(loose, 'run-2026-11-17-10-00-00.json'), '{}'); fs.chmodSync(loose, 0o777);
+    ok('a shared folder others can write into is not read at all', D.pending(loose, []).length === 0);
+} else console.log('ok   (the writable-by-others case runs only on a system like the car has)');
 ok('never more than twenty at a time', D.pending(evil, []).length === D.MAX_FILES);
 ok('a stick that cannot be written: said, not thrown', (() => { const x = D.copyTo(shm, path.join(root, 'no', 'such', 'stick'), [name(15)]); return x.copied === 0 && x.failed === 1 && !!x.why; })());
 

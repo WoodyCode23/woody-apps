@@ -127,6 +127,12 @@ class RunLog {
             try { fs.mkdirSync(outDir, 0o755); } catch (e) { if (e.code !== 'EEXIST') throw e; }
             const me = typeof process.getuid === 'function' ? process.getuid() : null;
             const dst = fs.lstatSync(outDir);
+            /* its parent is the apps' shared folder: sticky (nobody but an owner can rename or remove what is in it,
+             * so the folder checked here cannot be swapped for another afterwards), or this app's own */
+            if (process.platform !== 'win32') {
+                const up = fs.lstatSync(path.dirname(outDir));
+                if (!up.isDirectory() || up.isSymbolicLink() || (!(up.mode & 0o1000) && up.uid !== me)) throw new Error('the parent of the shared folder is not safe to share in');
+            }
             /* and it is where its name says it is: a link of any kind resolves somewhere else */
             const real = fs.realpathSync(outDir), named = path.join(fs.realpathSync(path.dirname(outDir)), path.basename(outDir));
             if (!dst.isDirectory() || dst.isSymbolicLink() || real !== named || (me !== null && dst.uid !== me)) throw new Error('the shared folder is not this app\'s own');
@@ -141,6 +147,8 @@ class RunLog {
                 try { fs.writeSync(fd, data, 0, data.length); } finally { fs.closeSync(fd); }
                 fs.renameSync(tmp, path.join(outDir, f));
             });
+            const after = fs.lstatSync(outDir);
+            if (after.ino !== dst.ino || after.dev !== dst.dev) throw new Error('the shared folder changed while it was written');
             return want.length;
         } catch (e) { this.error = String(e && e.message || e); return -1; }
     }
