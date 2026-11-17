@@ -21,9 +21,10 @@ pairing token, and the go-between only exposes the tiles you list in its configu
 1. Install [Car Relay](https://github.com/WoodyCode23/car-relay) in Home Assistant (HACS custom repository, or by hand)
    and add its configuration. Its README has the details.
 2. Install the Home Assistant app on the car from this repository.
-3. Tell the car where your house is: the app shows a QR code; scan it with a phone on the same network as the car
-   (its hotspot is easiest) and paste your Home Assistant address into the page that opens. If that cannot work on
-   your car, the app offers an on-screen keyboard instead.
+3. Tell the car where your house is: type your Home Assistant address on the app's on-screen keyboard. (The app
+   can also show a page for a phone to type it into, but on the car this was tested on, 2026-11-17, a phone on
+   the same Wi-Fi could not reach it: the head unit lets apps connect out and nothing connect in. So the keyboard
+   is the way. Pairing and unlocking by QR are unaffected: there the phone talks to Home Assistant, not to the car.)
 
 ## Pairing
 
