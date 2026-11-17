@@ -61,7 +61,9 @@ check('the keyboard: keys, words, delete, clear, and a length it will not pass',
 /* ---- the phone page, on loopback */
 function req(port, method, p, body) {
     return new Promise((resolve, reject) => {
-        const r = http.request({ host: '127.0.0.1', port: port, method: method, path: p, headers: body ? { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) } : {} }, (res) => {
+        /* one connection per request, as Node 8 does by itself: newer Node keeps a connection open and would send the next
+         * request down it after the page has closed, which tests the client's habits and not the page */
+        const r = http.request({ host: '127.0.0.1', port: port, method: method, path: p, agent: false, headers: Object.assign({ Connection: 'close' }, body ? { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) } : {}) }, (res) => {
             const parts = []; res.on('data', (b) => parts.push(b)); res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(parts).toString('utf8'), headers: res.headers }));
         });
         r.on('error', reject);
