@@ -127,7 +127,9 @@ class RunLog {
             try { fs.mkdirSync(outDir, 0o755); } catch (e) { if (e.code !== 'EEXIST') throw e; }
             const me = typeof process.getuid === 'function' ? process.getuid() : null;
             const dst = fs.lstatSync(outDir);
-            if (!dst.isDirectory() || dst.isSymbolicLink() || (me !== null && dst.uid !== me)) throw new Error('the shared folder is not this app\'s own');
+            /* and it is where its name says it is: a link of any kind resolves somewhere else */
+            const real = fs.realpathSync(outDir), named = path.join(fs.realpathSync(path.dirname(outDir)), path.basename(outDir));
+            if (!dst.isDirectory() || dst.isSymbolicLink() || real !== named || (me !== null && dst.uid !== me)) throw new Error('the shared folder is not this app\'s own');
             try { fs.chmodSync(outDir, 0o755); } catch (e) { /* best effort */ }
             const mine = (f) => { try { const s = fs.lstatSync(path.join(outDir, f)); return s.isFile() && (me === null || s.uid === me); } catch (e) { return false; } };
             const there = fs.readdirSync(outDir);
@@ -142,6 +144,16 @@ class RunLog {
             return want.length;
         } catch (e) { this.error = String(e && e.message || e); return -1; }
     }
+}
+
+/** the summary as one line for the log and the timeslip, or '' when the car gave nothing to go on */
+function line(s, unit) {
+    if (!s) return '';
+    const parts = [];
+    if (num(s.peakG)) parts.push('PEAK ' + s.peakG.toFixed(2) + ' G');
+    if (num(s.spinKmh)) parts.push(s.spinKmh >= SPIN_KMH ? 'WHEELSPIN EST ' + (unit === 'kmh' ? s.spinKmh.toFixed(0) + ' KM/H' : (s.spinKmh / 1.609344).toFixed(0) + ' MPH') + ' AT ' + s.spinAtS.toFixed(1) + ' S' : 'NO WHEELSPIN SEEN');
+    if (num(s.launchRpm)) parts.push('LEFT AT ' + Math.round(s.launchRpm / 10) * 10 + ' RPM');
+    return parts.join('  //  ');
 }
 
 module.exports = { SHARE: SHARE, RunLog: RunLog, analyse: analyse, line: line, KEEP: KEEP, MAX_ROWS: MAX_ROWS, STEP_MS: STEP_MS, SPIN_KMH: SPIN_KMH };
