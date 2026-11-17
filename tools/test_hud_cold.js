@@ -3,7 +3,7 @@
  * The rev bar's lower red while the oil is cold (apps/woodr_hud/strip.js coldZones), and when Warm-Up HUD's
  * low-tyre warning is on the display (apps/woodr_warmhud/lowtyre.js). */
 const path = require('path');
-const { coldZones } = require(path.join(__dirname, '..', 'apps', 'woodr_hud', 'strip.js'));
+const { coldZones, gearText, GEAR, CARD } = require(path.join(__dirname, '..', 'apps', 'woodr_hud', 'strip.js'));
 const { LowTyre, SHOW_MS } = require(path.join(__dirname, '..', 'apps', 'woodr_warmhud', 'lowtyre.js'));
 
 let failed = 0;
@@ -19,6 +19,11 @@ ok('it only climbs', (() => { let last = 0; for (let t = -20; t <= 95; t++) { co
 ok('yellow, green and the flash keep their order below it', [20, 40, 60, 80].every((t) => { const r = z(t); return r.green < r.yellow && r.yellow < r.red && r.red < r.shift && r.shift <= 6800 && r.yellow <= 5500 && r.green <= 4000; }));
 ok('defaults stand in for settings never saved', coldZones({}, { oil: 20, readyAt: 90 }).red === 3000 && coldZones({}, null).red === 6300);
 ok('a red already set at or under the cold figure is left alone', coldZones({ red: 3000 }, { oil: 20, readyAt: 90 }).red === 3000 && coldZones({ red: 3000 }, { oil: 20, readyAt: 90 }).cold === false);
+
+ok('gear: the engaged gear in drive, with D small above it', JSON.stringify(gearText({ gear: 4, stage: 'D' })) === '{"big":"4","small":"D"}' && gearText({ gear: 7 }).big === '7' && gearText({ gear: 7 }).small === '');
+ok('gear: P, R and N are the figure themselves, whatever the gear field says', ['P', 'R', 'N'].every((s) => gearText({ gear: 3, stage: s }).big === s) && gearText({ gear: -1 }).big === 'R' && gearText({ gear: 0 }).big === 'N' && gearText({ stage: 'D' }).big === 'D');
+ok('gear: nothing known is nothing shown', [null, {}, { gear: NaN }, { gear: 'x' }, { gear: 14 }, { gear: -5 }].every((d) => gearText(d) === null));
+ok('gear: it sits in the gap between the car\'s speed and the song card, in the same row', GEAR.x >= 342 && GEAR.x + GEAR.w <= CARD.x - 4 && GEAR.y === CARD.y && GEAR.h === CARD.h);
 
 const low = new LowTyre();
 ok('a tyre at its target: no warning', low.show(0.05, 0.2, 0) === false && low.show(null, 0.2, 0) === false);

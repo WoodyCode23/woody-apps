@@ -30,7 +30,7 @@ const { Canvas, withAlpha } = require('./kit/canvas');
 const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
 const { Song } = require('./song');
-const { coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
+const { GEAR, gearText, drawGear, coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
 const shared = require('./shared');
 const fs = require('fs');
 const path = require('path');
@@ -59,7 +59,7 @@ function drawFrame(cv, w, h, colour) {
 
 async function background(bg) {
     const { log, settings } = bg;
-    const car = new Car(bg, ['rpm']);
+    const car = new Car(bg, ['rpm', 'gear']);
     const waze = new Waze(log);
     const st = { menuOpen: false, at: 0, group: null, sels: {}, gateOffUntil: 0, say: '', sayUntil: 0, pending: null, openedAt: 0, warmup: 'auto', shiftOn: settings.get('shift') !== false, stage: '', box: null, lastPick: '' };
     const cr = ClusterRender ? new ClusterRender(APP_ID) : null;
@@ -391,6 +391,25 @@ async function background(bg) {
      * bar's length changes (about every five seconds). Off unless switched on. */
     const STAGE = { x: 700, y: 150, w: 660, h: 450 }, CLUSTER_SCALE = 1.5, CLUSTER_PAD = 12;
     let clusterLayer = 0, clusterKey = '', clusterGeom = '';
+    /* ---------- the gear, between the car's own speed and the song card ---------- */
+    let gearLayer = 0, gearKey = '';
+    function hideGear() { if (gearLayer && cr) { cr.drop(gearLayer); } gearLayer = 0; gearKey = ''; }
+    function showGear(d, running, stage) {
+        const t = settings.get('gear') !== false && running ? gearText(d) : null;
+        if (!t) { hideGear(); return; }
+        const hot = stage === 'red' || stage === 'flash', key = t.big + '|' + t.small + '|' + (hot ? 1 : 0);
+        if (!gearLayer) {
+            gearLayer = cr.image({ target: 'hud', klass: 'overlay', z: 7, x: GEAR.x, y: GEAR.y, w: GEAR.w, h: GEAR.h, iw: GEAR.w, ih: GEAR.h, fps: 6, sampling: 'nearest' });
+            if (!gearLayer) { log.warn('gear layer refused'); return; }
+            gearKey = '';
+        }
+        if (key === gearKey) return;
+        const cv = new Canvas(GEAR.w, GEAR.h);
+        drawGear(cv, GEAR.w, GEAR.h, t, hot);
+        cr.pixels(gearLayer, null, Buffer.from(cv.d.buffer || cv.d));
+        if (!gearKey) log.info('gear: shown (' + t.big + (t.small ? ' ' + t.small : '') + ')');
+        gearKey = key;
+    }
     function clusterBox() {
         const at = settings.get('songClusterAt'), w = Math.round(CARD.w * CLUSTER_SCALE), h = Math.round(CARD.h * CLUSTER_SCALE);
         const x = at === 'left' ? STAGE.x + CLUSTER_PAD : at === 'middle' ? STAGE.x + Math.round((STAGE.w - w) / 2) : STAGE.x + STAGE.w - w - CLUSTER_PAD;
@@ -432,6 +451,7 @@ async function background(bg) {
             const running = testLeft > 0 || (rpm !== null && rpm > 400);
             showClusterSong();
             showSong();              /* the song line is up whenever CarPlay names a track, engine or not (its switch is in the settings) */
+            showGear(d, running && testLeft <= 0, stage);
             if (settings.get('style') !== 'frame') {
                 /* the rev bar: shown whenever the engine runs, whatever the stage; the old frame stays away */
                 hideFrame();
@@ -451,7 +471,7 @@ async function background(bg) {
     const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 15000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
-    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); hideBar(); hideSong(); hideClusterSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
+    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); hideBar(); hideSong(); hideGear(); hideClusterSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
     return { st: st, items: items, waze: waze, pick: pick, act: act, song: song };
 }
 

@@ -147,4 +147,32 @@ function drawCard(cv, w, h, song) {
     return bg;
 }
 
-module.exports = { coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };
+/* The gear, in the gap of the bottom row between the car's own speed (which ends near x 340) and the song card
+ * (which starts at x 424): one large figure, with the selector's letter small above it while in drive. */
+const GEAR = { x: 346, y: 308, w: 72, h: 64 };
+
+/**
+ * What to show for the gear: { big, small } or null when there is nothing to say.
+ * d = { gear (1 to 9, 0 neutral, -1 reverse, or not a number), stage ('P' | 'R' | 'N' | 'D' or undefined) }.
+ * In drive the engaged gear is the figure and D the small letter; P, R and N are the figure themselves.
+ */
+function gearText(d) {
+    if (!d) return null;
+    const g = typeof d.gear === 'number' && isFinite(d.gear) ? Math.round(d.gear) : null, st = d.stage;
+    if (st === 'P' || st === 'R' || st === 'N') return { big: st, small: '' };
+    if (g !== null && g >= 1 && g <= 9) return { big: String(g), small: st === 'D' ? 'D' : '' };
+    if (g === -1) return { big: 'R', small: '' };
+    if (st === 'D') return { big: 'D', small: '' };
+    if (g === 0) return { big: 'N', small: '' };
+    return null;
+}
+
+/** the gear figure on a GEAR.w x GEAR.h canvas: `hot` (near the shift point) turns it the accent colour */
+function drawGear(cv, w, h, t, hot) {
+    cv.roundRect(0, 0, w, h, 18, '#16181e');
+    const colour = hot ? ACCENT : t.big === 'R' ? AMBER : '#ffffff';
+    if (t.small) cv.text(t.small, w / 2, 16, 12, '#8d8e96', { font: 'bold', align: 'center' });
+    cv.text(t.big, w / 2, t.small ? 56 : 51, t.small ? 42 : 46, colour, { font: 'bold', align: 'center' });
+}
+
+module.exports = { GEAR: GEAR, gearText: gearText, drawGear: drawGear, coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };

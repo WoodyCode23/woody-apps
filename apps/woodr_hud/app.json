@@ -2,7 +2,7 @@
   "id": "woodr_hud",
   "title": "HUD",
   "description": "A menu on the head-up display worked from the steering wheel: every app's switches and choices in one roller, and a press changes one while the menu stays open. A rev bar across the top of the display that changes colour and blinks at the shift point, and the song CarPlay is playing with its time left. Read-only: signals in, pixels out.",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "vendor": "custom",
   "loggingId": "OAAE",
   "iconGlyph": "live_data",
@@ -26,6 +26,11 @@
       "currentItemMetadata": "rs",
       "currentItemTime": "rs",
       "playerState": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "_optional": "the gear and the selector position, for the gear on the head-up display",
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
     }
   },
   "screens": [
@@ -107,6 +112,13 @@
       ],
       "default": "top",
       "hudLabel": "Position"
+    },
+    {
+      "key": "gear",
+      "label": "Show the gear, between the speed and the song",
+      "type": "bool",
+      "default": true,
+      "hudLabel": "Gear"
     },
     {
       "key": "song",
