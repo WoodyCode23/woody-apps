@@ -3,7 +3,7 @@
  * The rev bar's lower red while the oil is cold (apps/woodr_hud/strip.js coldZones), and when Warm-Up HUD's
  * low-tyre warning is on the display (apps/woodr_warmhud/lowtyre.js). */
 const path = require('path');
-const { coldZones, gearText, GEAR, CARD } = require(path.join(__dirname, '..', 'apps', 'woodr_hud', 'strip.js'));
+const { coldZones, gearText, GEAR, CARD, MARKS, MARK_LABEL, MARKBAR, markAt, markStep } = require(path.join(__dirname, '..', 'apps', 'woodr_hud', 'strip.js'));
 const { LowTyre, SHOW_MS } = require(path.join(__dirname, '..', 'apps', 'woodr_warmhud', 'lowtyre.js'));
 
 let failed = 0;
@@ -24,6 +24,10 @@ ok('gear: the engaged gear in drive, with D small above it', JSON.stringify(gear
 ok('gear: P, R and N are the figure themselves, whatever the gear field says', ['P', 'R', 'N'].every((s) => gearText({ gear: 3, stage: s }).big === s) && gearText({ gear: -1 }).big === 'R' && gearText({ gear: 0 }).big === 'N' && gearText({ stage: 'D' }).big === 'D');
 ok('gear: nothing known is nothing shown', [null, {}, { gear: NaN }, { gear: 'x' }, { gear: 14 }, { gear: -5 }].every((d) => gearText(d) === null));
 ok('gear: it sits in the gap between the car\'s speed and the song card, in the same row', GEAR.x >= 342 && GEAR.x + GEAR.w <= CARD.x - 4 && GEAR.y === CARD.y && GEAR.h === CARD.h);
+ok('mark: five choices in the order the roller meets them, each with a label', MARKS.join() === 'police,fire,ambulance,other,none' && MARKS.every((m) => typeof MARK_LABEL[m] === 'string' && MARK_LABEL[m].length <= 12));
+ok('mark: the bar starts on the guess, an unknown guess on "other"', markAt('police') === 0 && markAt('ambulance') === 2 && markAt('tank') === 3 && markAt(undefined) === 3);
+ok('mark: the roller steps one at a time and wraps both ways', markStep(0, true) === 1 && markStep(4, true) === 0 && markStep(0, false) === 4 && markStep(2, false) === 1);
+ok('mark: the bar sits right of Scout\'s first card, clear of the song row and inside the display\'s window', MARKBAR.x >= 220 + 260 && MARKBAR.x + MARKBAR.w <= 690 && MARKBAR.y + MARKBAR.h <= CARD.y);
 
 const low = new LowTyre();
 ok('a tyre at its target: no warning', low.show(0.05, 0.2, 0) === false && low.show(null, 0.2, 0) === false);

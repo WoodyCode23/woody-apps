@@ -175,4 +175,24 @@ function drawGear(cv, w, h, t, hot) {
     cv.text(t.big, w / 2, t.small ? 56 : 51, t.small ? 42 : 46, colour, { font: 'bold', align: 'center' });
 }
 
-module.exports = { GEAR: GEAR, gearText: gearText, drawGear: drawGear, coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };
+/* The quick-mark bar: while another app (Scout) has a card up that can be marked, one small tile beside it
+ * shows the choice the roller is on; pressing the roller marks it. Five choices, the likeliest first shown. */
+const MARKS = ['police', 'fire', 'ambulance', 'other', 'none'];
+const MARK_LABEL = { police: 'POLICE', fire: 'FIRE ENGINE', ambulance: 'AMBULANCE', other: 'OTHER', none: 'NOTHING' };
+const MARKBAR = { x: 484, y: 188, w: 200, h: 60 };          /* right of the first card, inside the clear slot */
+
+/** where the roller lands: `at` moved by one step, wrapping; a guess that is not a mark starts at 'other' */
+function markAt(guess) { const i = MARKS.indexOf(guess); return i >= 0 ? i : MARKS.indexOf('other'); }
+function markStep(at, down) { const n = MARKS.length; return ((at + (down ? 1 : -1)) % n + n) % n; }
+
+/** the bar: `at` the chosen mark, or `note` (what just happened) in its place */
+function drawMark(cv, w, h, at, note) {
+    cv.roundRect(0, 0, w, h, 14, '#14161c');
+    if (note) { cv.text(String(note).slice(0, 22), w / 2, 37, 17, '#2fd27a', { font: 'bold', align: 'center' }); return; }
+    cv.text('MARK: PRESS', 14, 19, 11, '#8d8e96', { font: 'bold' });
+    cv.text(MARK_LABEL[MARKS[at]], w / 2, 42, 19, '#ffffff', { font: 'bold', align: 'center' });
+    const gap = 14, x0 = w / 2 - gap * (MARKS.length - 1) / 2;
+    for (let i = 0; i < MARKS.length; i++) cv.roundRect(Math.round(x0 + i * gap - 3), 50, 6, 4, 2, i === at ? ACCENT : '#3a3d47');
+}
+
+module.exports = { MARKS: MARKS, MARK_LABEL: MARK_LABEL, MARKBAR: MARKBAR, markAt: markAt, markStep: markStep, drawMark: drawMark, GEAR: GEAR, gearText: gearText, drawGear: drawGear, coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };

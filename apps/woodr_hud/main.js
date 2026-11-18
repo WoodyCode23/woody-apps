@@ -30,7 +30,7 @@ const { Canvas, withAlpha } = require('./kit/canvas');
 const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
 const { Song } = require('./song');
-const { GEAR, gearText, drawGear, coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
+const { MARKS, MARK_LABEL, MARKBAR, markAt, markStep, drawMark, GEAR, gearText, drawGear, coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
 const shared = require('./shared');
 const fs = require('fs');
 const path = require('path');
@@ -75,6 +75,18 @@ async function background(bg) {
 
     shared.write('hud.json', { warmup: 'auto' });
 
+    /* ---------- marking (the bar itself is further down) ---------- */
+    const MARK_ARM_MS = 500;
+    const mk = { key: '', since: 0, at: 0, live: false, n: 0, sent: '', note: '', noteUntil: 0, undoUntil: 0, key2: '' };
+    let markLayer = 0;
+    function sendMark(as) {
+        if (!mk.key || MARKS.indexOf(as) < 0) { say('Nothing to mark right now'); return; }
+        mk.n++; mk.sent = process.pid + '-' + mk.n;
+        if (!shared.write('hud.scoutmark.json', { n: mk.sent, key: mk.key, as: as })) { say('Mark: could not be sent'); mk.sent = ''; return; }
+        mk.note = MARK_LABEL[as]; mk.noteUntil = Date.now() + 2500; mk.undoUntil = Date.now() + 60000; mk.key2 = '';
+        say('Marked: ' + MARK_LABEL[as].toLowerCase());
+        log.info('mark: ' + as);
+    }
     /* ---------- the menu ---------- */
     let sizeIx = 1;
     const syncSize = () => { const pct = waze.st && waze.st.hud_width_pct; const i = SIZES.findIndex((z) => z[1] === pct); if (i >= 0) sizeIx = i; };
@@ -90,6 +102,9 @@ async function background(bg) {
         list.push({ g: 'Quick actions', app: null, key: 'waze', kind: 'action', label: 'Waze map', value: SIZES[sizeAt()][0] });
         list.push({ g: 'Quick actions', app: null, key: 'ambient', kind: 'action', label: 'Ambient colour', value: 'Next' });
         list.push({ g: 'Quick actions', app: null, key: 'test', kind: 'action', label: 'Test the rev bar', value: 'Run' });
+        /* marking what a Scout card really was: a row for each choice while a card can be marked, and the way back for a minute */
+        if (mk.live) MARKS.forEach((m) => list.push({ g: 'Mark what you see', app: null, key: 'mark:' + m, kind: 'action', label: MARK_LABEL[m].charAt(0) + MARK_LABEL[m].slice(1).toLowerCase(), value: 'Mark' }));
+        if (Date.now() < mk.undoUntil) list.push({ g: 'Quick actions', app: null, key: 'unmark', kind: 'action', label: 'Undo last mark', value: 'Undo' });
         /* Launch, while it runs: arm its tree (or cancel it) from here, whatever the centre screen shows */
         const launch = shared.read('launch.state.json', 5000);
         if (launch) list.push({ g: 'Quick actions', app: null, key: 'launch', kind: 'action', label: 'Launch', value: launch.state === 'armed' ? 'Cancel' : launch.state === 'run' ? 'Running' : 'Arm the tree' });
@@ -177,6 +192,8 @@ async function background(bg) {
     function pick(key) {
         st.lastPick = key;
         log.info('menu: ' + key);
+        if (key.indexOf('mark:') === 0) { sendMark(key.slice(5)); return; }
+        if (key === 'unmark') { mk.n++; shared.write('hud.scoutmark.json', { n: process.pid + '-' + mk.n, undo: true }); mk.undoUntil = 0; say('Mark taken back'); log.info('mark: undo asked'); return; }
         if (key === 'highlight') { highlight(); return; }
         if (key === 'warmup') { st.warmup = st.warmup === 'hide' ? 'show' : 'hide'; shared.write('hud.json', { warmup: st.warmup }); say('Warm-Up: ' + (st.warmup === 'hide' ? 'hidden for this drive' : 'shown')); }
         else if (key === 'shift') { st.shiftOn = !st.shiftOn; settings.set('shift', st.shiftOn); }
@@ -248,12 +265,16 @@ async function background(bg) {
         /* The roller's press selects the chosen row, only with the wheel gate: without it the car's own list is open
          * under our menu and the same press would pick in that. */
         onPress: () => {
+            /* menu closed and a card can be marked: this press is the mark (only with the wheel gate, which keeps the
+             * press from the car's own lists, and not in the bar's first half second: that press was meant for something else) */
+            if (!st.menuOpen && mk.live && gateWanted() && Date.now() - mk.since >= MARK_ARM_MS) { sendMark(MARKS[mk.at]); return; }
             if (!st.menuOpen || !gateWanted()) return;
             st.touched = Date.now();
             act(items()[st.at]);
             if (st.menuOpen) showMenu(true);
         },
         onRoll: (d) => {
+            if (!st.menuOpen && mk.live && gateWanted()) { mk.at = markStep(mk.at, d < 0); mk.key2 = ''; return; }
             if (!st.menuOpen) return;
             const list = items(), n = list.length;
             /* on the car rolling the roller DOWN reports 127 - n (d < 0), and down must go to the next item */
@@ -286,10 +307,39 @@ async function background(bg) {
         try {
             if (!gateWanted() || Date.now() < st.gateOffUntil) return;
             touchGate('wheelgate.menu');
-            if (st.menuOpen) touchGate('wheelgate.roll');
+            if (st.menuOpen || mk.live) touchGate('wheelgate.roll');      /* the roller is ours while the menu or the mark bar is up */
         } catch (e) { log.warn('wheel gate: ' + e); }
     }, 200);
     if (gateTimer.unref) gateTimer.unref();
+
+    /* ---------- the quick-mark bar (see strip.js): Scout says which card can be marked in scout.mark.json ---------- */
+    const markTimer = setInterval(() => {
+        try {
+            const now = Date.now();
+            const m = settings.get('markBar') !== false ? shared.read('scout.mark.json', 2500) : null;
+            const key = m && typeof m.key === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(m.key) ? m.key : '';
+            if (key && key !== mk.key) { mk.key = key; mk.since = now; mk.at = markAt(m.guess); mk.key2 = ''; log.info('mark: a card can be marked'); }
+            if (!key) mk.key = '';
+            mk.live = !!key;
+            /* what came of the last mark, said once */
+            const r = mk.sent ? shared.read('scout.marked.json', 6000) : null;
+            if (r && r.n === mk.sent) { mk.sent = ''; mk.note = r.ok ? (r.as === 'undo' ? 'TAKEN BACK' : 'MARKED') : 'NOT SENT'; mk.noteUntil = now + 2500; mk.key2 = ''; if (!r.ok) { mk.undoUntil = 0; log.info('mark: not sent (' + String(r.why || '').slice(0, 60) + ')'); } }
+            const note = now < mk.noteUntil ? mk.note : '';
+            if (!cr || st.menuOpen || (!mk.live && !note)) { if (markLayer && cr) { cr.drop(markLayer); } markLayer = 0; mk.key2 = ''; return; }
+            if (!markLayer) {
+                markLayer = cr.image({ target: 'hud', klass: 'overlay', z: 8, x: MARKBAR.x, y: MARKBAR.y, w: MARKBAR.w, h: MARKBAR.h, iw: MARKBAR.w, ih: MARKBAR.h, fps: 6, sampling: 'nearest' });
+                if (!markLayer) { log.warn('mark layer refused'); return; }
+                mk.key2 = '';
+            }
+            const k2 = note || String(mk.at);
+            if (k2 === mk.key2) return;
+            mk.key2 = k2;
+            const cv = new Canvas(MARKBAR.w, MARKBAR.h);
+            drawMark(cv, MARKBAR.w, MARKBAR.h, mk.at, note);
+            cr.pixels(markLayer, null, Buffer.from(cv.d.buffer || cv.d));
+        } catch (e) { log.warn('mark: ' + e); }
+    }, 200);
+    if (markTimer.unref) markTimer.unref();
 
     const menuTimer = setInterval(() => {
         try {
@@ -471,7 +521,7 @@ async function background(bg) {
     const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 15000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
-    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, wazeTimer].forEach(clearInterval); closeMenu(); hideFrame(); hideBar(); hideSong(); hideGear(); hideClusterSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
+    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, wazeTimer, markTimer].forEach(clearInterval); if (markLayer && cr) { try { cr.drop(markLayer); } catch (e) { /* going */ } } closeMenu(); hideFrame(); hideBar(); hideSong(); hideGear(); hideClusterSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
     return { st: st, items: items, waze: waze, pick: pick, act: act, song: song };
 }
 

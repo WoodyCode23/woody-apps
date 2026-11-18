@@ -4,6 +4,8 @@
  *
  *   hud.json     written by HUD's menu: { warmup: 'auto' | 'hide' | 'show', at }   (Warm-Up HUD reads it)
  *   warmup.json  written by Warm-Up HUD while the engine runs: { oil, readyAt } deg C   (HUD's rev bar reads it)
+ *   scout.mark.json  written by Scout: the card that can be marked now { key, title, guess }; hud.scoutmark.json by HUD:
+ *                    the driver's choice { n, key, as } or { n, undo: true }; scout.marked.json by Scout: what came of it
  *   ambient.json written by HUD's menu: { cmd: 'next', n, at }                      (Ambient Studio reads it)
  *
  * Each app runs as its own user, so the folder is 1777 (anyone writes, only a file's owner replaces it) and the
