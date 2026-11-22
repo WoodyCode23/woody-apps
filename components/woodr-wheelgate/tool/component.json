@@ -1,0 +1,37 @@
+{
+  "id": "woodr-wheelgate",
+  "kind": "tool",
+  "version": "1.0.0",
+  "title": "Wheel gate",
+  "description": "Lets the HUD's menu have the steering wheel's menu button and roller; loads into the HMI at the next start, beside the controller gate (iDrive 7)",
+  "mguHmi": [
+    "ID7"
+  ],
+  "files": [
+    {
+      "path": "woodr-wheelgate.so",
+      "mode": "0755"
+    },
+    {
+      "path": "guard.sh",
+      "mode": "0755"
+    }
+  ],
+  "units": [
+    {
+      "name": "woodr-wheelgate-guard.service"
+    },
+    {
+      "name": "woodr-wheelgate-check.service"
+    }
+  ],
+  "dropins": [
+    {
+      "unit": "hmi.service",
+      "name": "zzz-woodr-wheelgate.conf"
+    }
+  ],
+  "enable": [],
+  "recmgr": [],
+  "restart": []
+}

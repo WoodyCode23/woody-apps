@@ -1,0 +1,10 @@
+# Wheel gate (woodr-wheelgate): the HMI came up healthy with woodr-wheelgate.so: reset the guard
+[Unit]
+Description=woodr-wheelgate check
+After=hmi.service hmi8.service
+RequiresMountsFor=/var/opt/woodr-wheelgate
+
+[Service]
+# runs on after the check (never exits): a service that stops makes the head unit reboot
+Type=simple
+ExecStart=/bin/sh /var/opt/woodr-wheelgate/current/guard.sh check

@@ -73,7 +73,7 @@ makes the package.
 |---|---|---|
 | `woodr-dashkeep` | Dashcam: keeps clips on the car and clears the oldest when its space is used | Dashcam still saves clips and copies them to a stick |
 | `woodr-link` | Link: holds Tailscale to the car policy | Link shows that its service is missing |
-| `woodr-wheelgate` | HUD: keeps the wheel's menu button and roller from opening the car's own list while HUD's menu is up | HUD works; the car's list opens alongside it |
+| `woodr-wheelgate` | HUD: keeps the wheel's menu button and roller from opening the car's own list while HUD's menu is up. Installs from the Store as the tool "Wheel gate", beside the stock controller gate | HUD works; the car's list opens alongside it |
 
 Installing one (done this way for `woodr-dashkeep` on one car; the other two have only been placed by hand):
 

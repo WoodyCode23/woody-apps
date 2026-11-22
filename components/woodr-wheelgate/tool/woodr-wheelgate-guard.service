@@ -1,0 +1,15 @@
+# Wheel gate (woodr-wheelgate): decides at boot whether the HMI (hmi.service) loads woodr-wheelgate.so
+[Unit]
+Description=woodr-wheelgate boot guard
+DefaultDependencies=no
+RequiresMountsFor=/var/opt/woodr-wheelgate
+Before=hmi.service hmi8.service
+# after the controller gate's guard when that is installed, so its library is kept beside this one
+After=mgu-inputgate-guard.service
+
+[Service]
+Type=oneshot
+# stays "active" after it ran: a service that stops makes the head unit's lifecycle reboot the unit
+RemainAfterExit=yes
+TimeoutStartSec=10
+ExecStart=/bin/sh /var/opt/woodr-wheelgate/current/guard.sh boot

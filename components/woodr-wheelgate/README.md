@@ -1,5 +1,40 @@
 # Wheel gate: the steering wheel's menu button and roller, kept from the car's own interface
 
+## Since 2026-11-22: a library and a Store tool of its own
+
+The wheel gate used to be a modified copy of the kit's controller gate, so every update of the controller gate
+replaced it (2026-11-17 and 2026-11-22) and the wheel went back to the car until it was rebuilt and put back by
+hand. It is now separate:
+
+| File | What it is |
+|---|---|
+| `woodr-wheelgate.cpp` | the wheel part alone: it looks only at the steering wheel's service and passes everything else on |
+| `tool/` | the Store tool `woodr-wheelgate` 1.0.0: `woodr-wheelgate.so` (sha256 `9a0e9a433060d60326c3ee3371d705a91e11330d66ee54c227645df10c0cd2f5`, 14336 bytes), its boot guard, two units and a drop-in for `hmi.service` |
+
+It installs from this repository's Store source like any tool (MGU Store, this source, "Wheel gate"), into
+`/var/opt/woodr-wheelgate`, and loads at the next head-unit start **beside** the stock controller gate. Neither
+replaces the other: the controller gate can update, or be removed, and this stays. The gate files, the owners
+list (`/var/opt/woody/wheelgate.conf`) and HUD's setting are unchanged.
+
+How the two load together: each has a boot guard that writes the HMI's `LD_PRELOAD` to its own file. Ours runs
+after the controller gate's and lists that library first and ours second; our drop-in (`zzz-...`) is read last.
+The guard is the controller gate's own script with the names changed: two starts in a row without the HMI
+staying up with the library, and it is left out.
+
+Checked 2026-11-22 (Ubuntu 18.04, g++ 7.5.0), NOT yet on the car:
+- `gate_test` passes with this library alone, and together with the stock controller gate 1.2.1 in either order
+  (22 of 22); the stock gate alone fails the three wheel checks, as it should.
+- Both guards run in order in a container: both libraries listed on a normal start; ours struck out leaves the
+  controller gate loading; the controller gate struck out, updated to a new version, or removed leaves ours.
+- Same four libraries, nothing newer than glibc 2.17; the only function it defines is the one hook.
+
+On the car, once: put the stock controller gate back as `current` if the modified build is still there (the Store
+does that when it updates the gate), install "Wheel gate" from the Store, and restart the head unit when parked.
+Then check HmiMain3D's maps list both libraries and run the parked test in step 5 below.
+
+The rest of this file describes the older, merged build (`mgu-inputgate.cpp`, `prebuilt/`). It is kept for the
+record and as a fallback; do not use it together with the tool.
+
 A build of the kit's controller gate (`mgu-inputgate.so`, MIT) with one addition. Since 2026-11-22 it is built on
 the gate's version 1.2.1 (cauliflowermossgrape/idrive7-apps, `kit/renderd/inputgate/mgu-inputgate.cpp` at commit
 `a387abaa`, which keeps the knob right after the car re-centres it); from 2026-11-17 on 1.2.0 (`eb1ed8cd`), before

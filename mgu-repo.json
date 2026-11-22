@@ -14,5 +14,16 @@
       "shared": ["kit/runtime", "kit/platform", "kit/localization", "kit/tools/build.py", "kit/tools/pack_data.py",
         "kit/tools/localize.py", "kit/tools/locale-revisions.json", "kit/tools/oapgen", "oap-sdk"]
     }
-  }
+  },
+  "tools": [
+    {
+      "id": "woodr-wheelgate",
+      "path": "components/woodr-wheelgate/tool",
+      "title": "Wheel gate",
+      "description": "Lets the HUD's menu have the steering wheel's menu button and roller; loads into the HMI at the next start, beside the controller gate (iDrive 7)",
+      "optional": true,
+      "uninstallable": true,
+      "mguHmi": ["ID7"]
+    }
+  ]
 }
