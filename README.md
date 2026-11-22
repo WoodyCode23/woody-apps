@@ -37,6 +37,25 @@ Try it from a copy of this repository: `tools\serve_studio_web.cmd` on Windows, 
 local web server, and open it in Chrome or Edge. Its rules for what an edit is live in `components/studio-core`.
 Tested with one car's clips and in Edge; other browsers fall back to a plainer export.
 
+## Marking what you see (needs extra hardware)
+
+The HUD has a small bar and a few menu rows for saying what is on the road: "I see: police", "fire engine",
+"ambulance" or "other", sent with one roll and a press of the steering wheel roller, with a minute to take it
+back. It can also mark what an alert really turned out to be. Those rows and the bar only appear when the
+hardware below is there and answering. Without it the HUD is unchanged.
+
+What it needs, beyond the car:
+
+- **A Scout box in the car.** Mine is a Raspberry Pi 3B+ with its own Wi-Fi and Bluetooth radio and a GPS
+  receiver, powered from the car. It listens to the radios near the car and keeps the record; the car only
+  sends it the choice you made.
+- **A network both can reach.** The car and the box join the same phone hotspot (or home Wi-Fi in the garage).
+- **The Scout car app**, which talks to the box. The HUD never talks to it directly.
+- **The wheel gate** (`components/woodr-wheelgate`), so the roller press belongs to the HUD while the bar is up.
+
+The Scout box's software and its car app are not in this repository. Contact me for more info: the contact
+section at [bimmerapps.com](https://bimmerapps.com/#contact).
+
 ## Install
 MGU Store → Settings → Add source → `WoodyCode23/woody-apps` → channel `branch:main` → Check now.
 

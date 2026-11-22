@@ -185,14 +185,32 @@ const MARKBAR = { x: 484, y: 188, w: 200, h: 60 };          /* right of the firs
 function markAt(guess) { const i = MARKS.indexOf(guess); return i >= 0 ? i : MARKS.indexOf('other'); }
 function markStep(at, down) { const n = MARKS.length; return ((at + (down ? 1 : -1)) % n + n) % n; }
 
-/** the bar: `at` the chosen mark, or `note` (what just happened) in its place */
-function drawMark(cv, w, h, at, note) {
+/** what can be reported as seen with no alert behind it (a sighting): the marks, less 'none' */
+const SEEN = ['police', 'fire', 'ambulance', 'other'];
+
+/** a small sign for a kind, drawn from rounded boxes only: a shield, a flame, a cross, a dot. (x, y) is its top left, s its size */
+function drawIcon(cv, kind, x, y, s) {
+    const u = s / 12, b = (bx, by, bw, bh, r, c) => cv.roundRect(Math.round(x + bx * u), Math.round(y + by * u), Math.max(1, Math.round(bw * u)), Math.max(1, Math.round(bh * u)), Math.max(0, Math.round(r * u)), c);
+    if (kind === 'police') { b(1, 0, 10, 7, 2, '#3b82f6'); b(2, 5, 8, 4, 3, '#3b82f6'); b(4, 8, 4, 4, 2, '#3b82f6'); b(5, 3, 2, 4, 1, '#ffffff'); }
+    else if (kind === 'fire') { b(2, 5, 8, 7, 4, '#ff7a1a'); b(4, 2, 5, 6, 2, '#ff7a1a'); b(6, 0, 2, 4, 1, '#ff7a1a'); b(5, 8, 3, 3, 1, '#ffd23a'); }
+    else if (kind === 'ambulance') { b(0, 0, 12, 12, 3, '#ffffff'); b(5, 2, 2, 8, 0, '#ff2d3d'); b(2, 5, 8, 2, 0, '#ff2d3d'); }
+    else b(2, 2, 8, 8, 4, '#b9bcc6');
+}
+
+/** the bar: `at` the chosen mark, or `note` (what just happened) in its place, with the sign of `kind` when one is given */
+function drawMark(cv, w, h, at, note, kind) {
     cv.roundRect(0, 0, w, h, 14, '#14161c');
-    if (note) { cv.text(String(note).slice(0, 22), w / 2, 37, 17, '#2fd27a', { font: 'bold', align: 'center' }); return; }
+    if (note) {
+        const has = SEEN.indexOf(kind) >= 0;
+        if (has) drawIcon(cv, kind, 14, 17, 26);
+        cv.text(String(note).slice(0, 22), has ? (w + 40) / 2 : w / 2, 37, has ? 15 : 17, '#2fd27a', { font: 'bold', align: 'center' });
+        return;
+    }
+    if (SEEN.indexOf(MARKS[at]) >= 0) drawIcon(cv, MARKS[at], w - 32, 6, 18);
     cv.text('MARK: PRESS', 14, 19, 11, '#8d8e96', { font: 'bold' });
     cv.text(MARK_LABEL[MARKS[at]], w / 2, 42, 19, '#ffffff', { font: 'bold', align: 'center' });
     const gap = 14, x0 = w / 2 - gap * (MARKS.length - 1) / 2;
     for (let i = 0; i < MARKS.length; i++) cv.roundRect(Math.round(x0 + i * gap - 3), 50, 6, 4, 2, i === at ? ACCENT : '#3a3d47');
 }
 
-module.exports = { MARKS: MARKS, MARK_LABEL: MARK_LABEL, MARKBAR: MARKBAR, markAt: markAt, markStep: markStep, drawMark: drawMark, GEAR: GEAR, gearText: gearText, drawGear: drawGear, coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };
+module.exports = { SEEN: SEEN, drawIcon: drawIcon, MARKS: MARKS, MARK_LABEL: MARK_LABEL, MARKBAR: MARKBAR, markAt: markAt, markStep: markStep, drawMark: drawMark, GEAR: GEAR, gearText: gearText, drawGear: drawGear, coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };

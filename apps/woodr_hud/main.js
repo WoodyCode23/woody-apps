@@ -30,7 +30,7 @@ const { Canvas, withAlpha } = require('./kit/canvas');
 const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
 const { Song } = require('./song');
-const { MARKS, MARK_LABEL, MARKBAR, markAt, markStep, drawMark, GEAR, gearText, drawGear, coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
+const { SEEN, MARKS, MARK_LABEL, MARKBAR, markAt, markStep, drawMark, GEAR, gearText, drawGear, coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
 const shared = require('./shared');
 const fs = require('fs');
 const path = require('path');
@@ -77,15 +77,25 @@ async function background(bg) {
 
     /* ---------- marking (the bar itself is further down) ---------- */
     const MARK_ARM_MS = 500;
-    const mk = { key: '', since: 0, at: 0, live: false, n: 0, sent: '', note: '', noteUntil: 0, undoUntil: 0, key2: '' };
+    const mk = { key: '', since: 0, at: 0, live: false, n: 0, sent: '', note: '', noteUntil: 0, undoUntil: 0, key2: '', sight: false, kind: '' };
     let markLayer = 0;
     function sendMark(as) {
         if (!mk.key || MARKS.indexOf(as) < 0) { say('Nothing to mark right now'); return; }
         mk.n++; mk.sent = process.pid + '-' + mk.n;
         if (!shared.write('hud.scoutmark.json', { n: mk.sent, key: mk.key, as: as })) { say('Mark: could not be sent'); mk.sent = ''; return; }
-        mk.note = MARK_LABEL[as]; mk.noteUntil = Date.now() + 2500; mk.undoUntil = Date.now() + 60000; mk.key2 = '';
+        mk.note = MARK_LABEL[as]; mk.kind = as; mk.noteUntil = Date.now() + 2500; mk.undoUntil = Date.now() + 60000; mk.key2 = '';
         say('Marked: ' + MARK_LABEL[as].toLowerCase());
         log.info('mark: ' + as);
+    }
+    /* Something seen with no alert behind it: only the choice is handed to Scout, which sends it to its box. The
+     * menu gets out of the way so the bar can say what happened. */
+    function sendSight(as) {
+        if (!mk.sight || SEEN.indexOf(as) < 0) { say('Scout is not answering'); return; }
+        mk.n++; mk.sent = process.pid + '-' + mk.n;
+        if (!shared.write('hud.scoutmark.json', { n: mk.sent, sighting: true, as: as })) { say('Could not be sent'); mk.sent = ''; return; }
+        mk.note = MARK_LABEL[as]; mk.kind = as; mk.noteUntil = Date.now() + 3000; mk.undoUntil = Date.now() + 60000; mk.key2 = '';
+        log.info('sighting: ' + as);
+        closeMenu();
     }
     /* ---------- the menu ---------- */
     let sizeIx = 1;
@@ -127,7 +137,10 @@ async function background(bg) {
         if (st.group && groups.indexOf(st.group) < 0) st.group = null;      /* its app stopped while we were in it */
         let list;
         if (!st.group) {
+            /* right under Highlight while Scout's box takes sightings: one roll and a press says what was seen */
+            const seen = mk.sight ? SEEN.map((k) => ({ g: 'Menu', app: null, key: 'see:' + k, kind: 'action', label: 'I see: ' + MARK_LABEL[k].toLowerCase(), value: 'Mark' })) : [];
             list = [{ g: 'Menu', app: null, key: 'highlight', kind: 'action', label: 'Highlight this clip', value: 'Mark' }]
+                .concat(seen)
                 .concat(groups.map((g) => ({ g: 'Menu', app: null, key: 'group ' + g, kind: 'group', label: g, group: g, value: every.filter((it) => it.g === g).length })))
                 .concat([{ g: 'Menu', app: null, key: 'close', kind: 'close', label: 'Close', value: '' }]);
         } else {
@@ -193,7 +206,8 @@ async function background(bg) {
         st.lastPick = key;
         log.info('menu: ' + key);
         if (key.indexOf('mark:') === 0) { sendMark(key.slice(5)); return; }
-        if (key === 'unmark') { mk.n++; shared.write('hud.scoutmark.json', { n: process.pid + '-' + mk.n, undo: true }); mk.undoUntil = 0; say('Mark taken back'); log.info('mark: undo asked'); return; }
+        if (key.indexOf('see:') === 0) { sendSight(key.slice(4)); return; }
+        if (key === 'unmark') { mk.kind = ''; mk.n++; shared.write('hud.scoutmark.json', { n: process.pid + '-' + mk.n, undo: true }); mk.undoUntil = 0; say('Mark taken back'); log.info('mark: undo asked'); return; }
         if (key === 'highlight') { highlight(); return; }
         if (key === 'warmup') { st.warmup = st.warmup === 'hide' ? 'show' : 'hide'; shared.write('hud.json', { warmup: st.warmup }); say('Warm-Up: ' + (st.warmup === 'hide' ? 'hidden for this drive' : 'shown')); }
         else if (key === 'shift') { st.shiftOn = !st.shiftOn; settings.set('shift', st.shiftOn); }
@@ -321,9 +335,10 @@ async function background(bg) {
             if (key && key !== mk.key) { mk.key = key; mk.since = now; mk.at = markAt(m.guess); mk.key2 = ''; log.info('mark: a card can be marked'); }
             if (!key) mk.key = '';
             mk.live = !!key;
+            mk.sight = !!(m && m.sighting === true);
             /* what came of the last mark, said once */
             const r = mk.sent ? shared.read('scout.marked.json', 6000) : null;
-            if (r && r.n === mk.sent) { mk.sent = ''; mk.note = r.ok ? (r.as === 'undo' ? 'TAKEN BACK' : 'MARKED') : 'NOT SENT'; mk.noteUntil = now + 2500; mk.key2 = ''; if (!r.ok) { mk.undoUntil = 0; log.info('mark: not sent (' + String(r.why || '').slice(0, 60) + ')'); } }
+            if (r && r.n === mk.sent) { mk.sent = ''; mk.note = r.ok ? (r.as === 'undo' ? 'TAKEN BACK' : 'MARKED') : 'NOT SENT'; if (r.as === 'undo' || !r.ok) mk.kind = ''; mk.noteUntil = now + 2500; mk.key2 = ''; if (!r.ok) { mk.undoUntil = 0; log.info('mark: not sent (' + String(r.why || '').slice(0, 60) + ')'); } }
             const note = now < mk.noteUntil ? mk.note : '';
             if (!cr || st.menuOpen || (!mk.live && !note)) { if (markLayer && cr) { cr.drop(markLayer); } markLayer = 0; mk.key2 = ''; return; }
             if (!markLayer) {
@@ -335,7 +350,7 @@ async function background(bg) {
             if (k2 === mk.key2) return;
             mk.key2 = k2;
             const cv = new Canvas(MARKBAR.w, MARKBAR.h);
-            drawMark(cv, MARKBAR.w, MARKBAR.h, mk.at, note);
+            drawMark(cv, MARKBAR.w, MARKBAR.h, mk.at, note, mk.kind);
             cr.pixels(markLayer, null, Buffer.from(cv.d.buffer || cv.d));
         } catch (e) { log.warn('mark: ' + e); }
     }, 200);

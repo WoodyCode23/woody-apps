@@ -38,5 +38,19 @@ ok('pumped up, then low again: a new warning', low.show(0.1, 0.2, 4000000) === f
 ok('switched off: never', new LowTyre().show(1, 0, 0) === false && new LowTyre().show(1, undefined, 0) === false);
 ok('a reading on the line does not flap', (() => { const l = new LowTyre(); l.show(0.21, 0.2, 0); l.show(0.19, 0.2, SHOW_MS + 5); return l.show(0.21, 0.2, SHOW_MS + 10) === false; })());
 
+/* ---- something seen with no alert behind it (a sighting) */
+const fs = require('fs');
+const S = require(path.join(__dirname, '..', 'apps', 'woodr_hud', 'strip.js'));
+const hudMain = fs.readFileSync(path.join(__dirname, '..', 'apps', 'woodr_hud', 'main.js'), 'utf8');
+ok('sighting: four kinds, never "nothing"', S.SEEN.join() === 'police,fire,ambulance,other' && S.SEEN.every((k) => MARKS.indexOf(k) >= 0 && MARK_LABEL[k]));
+ok('sighting: each kind has a sign that stays inside its box, and the bar draws with and without one', (() => {
+    const boxes = [];
+    const cv = { roundRect: (x, y, w, h) => boxes.push([x, y, w, h]), text: () => {} };
+    return S.SEEN.every((k) => { boxes.length = 0; S.drawIcon(cv, k, 10, 20, 24); return boxes.length >= 1 && boxes.every((b) => b[0] >= 10 && b[1] >= 20 && b[0] + b[2] <= 34 && b[1] + b[3] <= 44); })
+        && (S.drawMark(cv, MARKBAR.w, MARKBAR.h, 0, '', '') || true) && (S.drawMark(cv, MARKBAR.w, MARKBAR.h, 0, 'POLICE', 'police') || true) && (S.drawMark(cv, MARKBAR.w, MARKBAR.h, 4, 'MARKED', 'tank') || true);
+})());
+ok('sighting: the rows show only while Scout says its box takes them, right under Highlight', /const seen = mk\.sight \? SEEN\.map\(/.test(hudMain) && /mk\.sight = !!\(m && m\.sighting === true\);/.test(hudMain) && hudMain.indexOf(".concat(seen)") < hudMain.indexOf(".concat(groups.map("));
+ok('sighting: only the choice is handed over, and the menu gets out of the way', /shared\.write\('hud\.scoutmark\.json', \{ n: mk\.sent, sighting: true, as: as \}\)/.test(hudMain) && /if \(!mk\.sight \|\| SEEN\.indexOf\(as\) < 0\)/.test(hudMain) && /log\.info\('sighting: ' \+ as\);\n        closeMenu\(\);/.test(hudMain.replace(/\r\n/g, '\n')));
+
 console.log(failed ? 'FAILED: ' + failed : 'all ok');
 process.exit(failed ? 1 : 0);
