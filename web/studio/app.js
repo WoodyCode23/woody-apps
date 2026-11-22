@@ -132,20 +132,24 @@ function take(list, handle) {
 
 /* each clip's length and speed, from its data file when it has one (the video itself says the rest later) */
 function readLengths() {
-    var todo = lib.clips.filter(function (c) { return c.meta >= 0; }), i = 0;
+    var todo = lib.clips.filter(function (c) { return c.meta >= 0; }), i = 0, done = 0;
     function next() {
         if (i >= todo.length) return Promise.resolve();
         var c = todo[i++], f = files[c.meta].file;
-        if (f.size > 8 * 1024 * 1024) return next();
+        var after = function () { done++; if (done % 20 === 0 || done === todo.length) $('status').textContent = 'Reading the clips: ' + done + ' of ' + todo.length; return next(); };
+        if (f.size > 8 * 1024 * 1024) return after();
         return f.text().then(function (text) {
             var doc = null;
             try { doc = JSON.parse(text); } catch (e) { /* not a data file */ }
             var track = C.speedtrack.fromMeta(doc);          /* speed only; doc is dropped here */
             doc = null;
             if (track.t.length > 1) { info[c.clip].track = track; info[c.clip].dur = track.t[track.t.length - 1] + (track.t[1] - track.t[0]); }
-        }).catch(function () { /* unreadable: the video will say */ }).then(next);
+        }).catch(function () { /* unreadable: the video will say */ }).then(after);
     }
-    return next();
+    /* six at a time: a stick answers small reads slowly, one after another is the slowest way to ask */
+    var lanes = [];
+    for (var k = 0; k < 6; k++) lanes.push(next());
+    return Promise.all(lanes);
 }
 
 function readSaved() {
@@ -238,17 +242,42 @@ function fromDrop(ev) {
 
 /* ---------------------------------------------------------------- drives and playing */
 
+var clipShown = -1, clipsOpen = true;
 function drawDrives() {
     var box = $('drives'); box.textContent = '';
     drives.forEach(function (d) {
-        var b = document.createElement('button'), secs = d.clips.reduce(function (a, c) { return a + (info[c.clip].dur || 40); }, 0);
-        b.className = 'item' + (D && D.id === d.id ? ' sel' : '');
+        var b = document.createElement('button'), secs = d.clips.reduce(function (a, c) { return a + (info[c.clip].dur || 40); }, 0), chosen = D && D.id === d.id;
+        b.className = 'item' + (chosen ? ' sel' : '');
         b.textContent = d.id.slice(0, 10) + '  ' + d.id.slice(11, 16).replace('.', ':');
-        var s = document.createElement('small'); s.textContent = d.clips.length + ' clips, ' + mmss(secs);
+        var s = document.createElement('small'); s.textContent = d.clips.length + ' clips, ' + mmss(secs) + (chosen ? (clipsOpen ? '  (press to fold)' : '  (press for its clips)') : '');
         b.appendChild(s);
-        b.onclick = function () { pick(d.id); };
+        b.setAttribute('aria-expanded', chosen && clipsOpen ? 'true' : 'false');
+        /* the chosen drive opens and folds its list of clips; another drive is chosen and opens */
+        b.onclick = function () { if (chosen) { clipsOpen = !clipsOpen; drawDrives(); } else { clipsOpen = true; pick(d.id); } };
         box.appendChild(b);
+        if (!chosen || !clipsOpen) return;
+        var list = document.createElement('div'); list.className = 'cliplist'; list.id = 'cliplist';
+        clips.forEach(function (c, i) {
+            var row = document.createElement('button');
+            row.className = 'clip' + (i === cur ? ' now' : '');
+            row.textContent = c.clip.slice(11, 19).replace(/\./g, ':');
+            var len = document.createElement('small'); len.textContent = mmss(c.dur) + (lib.clips[info[c.clip].i].ts ? '' : '  mp4');
+            row.appendChild(len);
+            row.onclick = function () { if (making) return; pause(); seek(offs[i] + 0.01); };
+            list.appendChild(row);
+        });
+        box.appendChild(list);
     });
+    clipShown = cur;
+}
+/* which clip is on screen, marked in the open list without drawing the list again */
+function markClip() {
+    clipShown = cur;
+    var list = document.getElementById('cliplist');
+    if (!list) return;
+    Array.prototype.forEach.call(list.children, function (row, i) { var on = i === cur; if (on !== row.classList.contains('now')) row.classList.toggle('now', on); });
+    var now = list.children[cur];
+    if (now && now.scrollIntoView) { try { now.scrollIntoView({ block: 'nearest' }); } catch (e) { /* an old browser: it stays where it is */ } }
 }
 
 function layout() {
@@ -270,10 +299,50 @@ function pick(id) {
 
 function clipAt(t) { var i = clips.length - 1; while (i > 0 && offs[i] > t) i--; return i; }
 
+/* Which clips are wanted now: the one being shown, and the next one being got ready. A clip nobody wants any more
+ * stops being read (a clip from the car is about 90 MB, and a stick is slow). */
+var want = {}, preparing = {}, prefetched = '';
+var tsWorker = null, tsJobs = {}, tsId = 0, tsBroken = false;
+
+/* the whole file, read in parts: given up as soon as the clip is no longer wanted, and it says how far it is */
+function readWhole(file, live, onPart) {
+    var size = file.size, parts = [], at = 0, STEP = 8 * 1048576;
+    var next = function () {
+        if (!live()) return Promise.reject(new Error('superseded'));
+        if (at >= size) {
+            var out = new Uint8Array(size), o = 0;
+            parts.forEach(function (p) { out.set(new Uint8Array(p), o); o += p.byteLength; });
+            parts = [];
+            return Promise.resolve(out.buffer);
+        }
+        return file.slice(at, Math.min(size, at + STEP)).arrayBuffer().then(function (buf) { parts.push(buf); at += buf.byteLength; onPart(size ? at / size : 1); return next(); });
+    };
+    return next();
+}
+
+/* the car's stream made playable, off the page's own thread where the browser allows (ts-worker.js); here otherwise */
+function rewrapAsync(buf) {
+    var here = function () { var r = C.tsmp4.rewrap(new Uint8Array(buf)); return r.ok ? { ok: true, mp4: r.mp4 } : { ok: false, error: r.error }; };
+    if (tsBroken || !window.Worker) return Promise.resolve().then(here);
+    return new Promise(function (done) {
+        try {
+            if (!tsWorker) {
+                tsWorker = new Worker('ts-worker.js');
+                tsWorker.onmessage = function (e) { var d = e.data || {}, f = tsJobs[d.id]; if (!f) return; delete tsJobs[d.id]; f(d.ok ? { ok: true, mp4: new Uint8Array(d.mp4) } : { ok: false, error: d.error }); };
+                tsWorker.onerror = function () { tsBroken = true; var jobs = tsJobs; tsJobs = {}; Object.keys(jobs).forEach(function (k) { jobs[k](null); }); };
+            }
+            var id = ++tsId, copy = buf.slice(0);          /* the worker takes its own copy: this one is kept in case it fails */
+            tsJobs[id] = function (r) { done(r || here()); };
+            tsWorker.postMessage({ id: id, buf: copy }, [copy]);
+        } catch (e) { tsBroken = true; done(here()); }
+    });
+}
+
 /* the video for a clip, as something the video element plays: the file itself, or the car's stream rewrapped */
-function urlFor(c) {
+function urlFor(c, quiet) {
     var hit = urls.filter(function (u) { return u.clip === c.clip; })[0];
     if (hit) return Promise.resolve(hit.url);
+    if (preparing[c.clip]) return preparing[c.clip];
     var f = files[c.video].file;
     var keep = function (blob) {
         var url = URL.createObjectURL(blob);
@@ -282,18 +351,29 @@ function urlFor(c) {
         return url;
     };
     if (!c.ts) return Promise.resolve(keep(f));
-    note('Preparing a clip straight from the car...');
-    return f.arrayBuffer().then(function (buf) {
-        var r = C.tsmp4.rewrap(new Uint8Array(buf));
-        if (!r.ok) throw new Error(r.error);
-        note('');
-        return keep(new Blob([r.mp4], { type: 'video/mp4' }));
-    });
+    var shown = function () { return !quiet || (cur >= 0 && clips[cur] && clips[cur].clip === c.clip); };      /* a clip got ready ahead says nothing, until it is the one waited for */
+    var p = readWhole(f, function () { return !!want[c.clip]; }, function (fr) { if (shown()) note('Getting the clip ready: ' + Math.round(fr * 100) + '%'); })
+        .then(rewrapAsync)
+        .then(function (r) { if (!r.ok) throw new Error(r.error); if (shown()) note(''); return keep(new Blob([r.mp4], { type: 'video/mp4' })); });
+    preparing[c.clip] = p;
+    var over = function () { delete preparing[c.clip]; };
+    p.then(over, over);
+    return p;
+}
+
+/* while a clip plays, the next one is got ready behind it, so the join between two clips does not stall */
+function prefetch(i) {
+    if (i < 0 || i >= clips.length) return;
+    var c = lib.clips[info[clips[i].clip].i];
+    if (!c || !c.ts || prefetched === c.clip) return;
+    prefetched = c.clip; want[c.clip] = true;
+    urlFor(c, true).catch(function () { prefetched = ''; });
 }
 
 function load(i, at) {
     var seq = ++loadSeq, c = lib.clips[info[clips[i].clip].i];
     cur = i;
+    want = {}; want[c.clip] = true; prefetched = '';
     return urlFor(c).then(function (url) {
         if (seq !== loadSeq) return;
         return new Promise(function (done) {
@@ -307,7 +387,7 @@ function load(i, at) {
             v.onerror = function () { if (seq === loadSeq) note('This clip could not be played here'); done(); };
             v.src = url;
         });
-    }).catch(function (e) { if (seq === loadSeq) note('This clip could not be opened (' + e.message + ')'); });
+    }).catch(function (e) { if (seq === loadSeq && e.message !== 'superseded') note('This clip could not be opened (' + e.message + ')'); });
 }
 
 function seek(t) {
@@ -329,16 +409,21 @@ function playEdit(k) {
     seek(s.a).then(function () { v.playbackRate = s.rate; play(); drawEdit(); });
 }
 
+var viewShown = '';
 /* one frame: where we are, the picture, the timeline */
 function frame() {
     requestAnimationFrame(frame);
     if (!D || cur < 0) return;
     if (!v.seeking && v.readyState >= 2) T = offs[cur] + v.currentTime;
+    if (dragT !== null) T = dragT;
+    if (cur !== clipShown) markClip();
     if (playing) {
+        if (!making && !xp && clips[cur] && v.currentTime > clips[cur].dur * 0.4) prefetch(cur + 1);
         if (eplay >= 0 && edit.segs[eplay] && T >= edit.segs[eplay].b - 0.04) { if (eplay + 1 < edit.segs.length) playEdit(eplay + 1); else { if (xp) endVideo(true); pause(); } }
         else if (v.ended || v.currentTime >= clips[cur].dur - 0.04) { if (cur + 1 < clips.length) seek(offs[cur + 1]); else pause(); }
     }
     drawPic(); drawTimeline();
+    if ($('s-view').value !== viewShown) { viewShown = $('s-view').value; showView(); }
     if (xp) filming();
     $('clock').textContent = mmss(T) + ' / ' + mmss(total);
 }
@@ -782,14 +867,24 @@ $('t-kind').onchange = function () {
 };
 $('b-run-back').onclick = function () { nudge(-0.1); };
 $('b-run-fwd').onclick = function () { nudge(0.1); };
-$('s-view').onchange = function () { if (esel >= 0 && edit.segs[esel] && !playing) { edit.segs[esel].view = this.value; drawEdit(); } };
+function showView() { Array.prototype.forEach.call($('views').children, function (b) { b.classList.toggle('on', b.getAttribute('data-view') === $('s-view').value); }); }
+$('s-view').onchange = function () { if (esel >= 0 && edit.segs[esel] && !playing) { edit.segs[esel].view = this.value; drawEdit(); } showView(); };
+Array.prototype.forEach.call($('views').children, function (b) { b.onclick = function () { if (making) return; $('s-view').value = b.getAttribute('data-view'); $('s-view').onchange(); }; });
+showView();
 
-var dragging = false;
-function tlSeek(e) { if (making) return; var r = tl.getBoundingClientRect(); pause(); seek((e.clientX - r.left) / r.width * total); }
-tl.addEventListener('pointerdown', function (e) { if (!D) return; dragging = true; tl.setPointerCapture(e.pointerId); tlSeek(e); });
-tl.addEventListener('pointermove', function (e) { if (dragging) tlSeek(e); });
-tl.addEventListener('pointerup', function () { dragging = false; });
-tl.addEventListener('pointercancel', function () { dragging = false; });
+var dragging = false, dragT = null;
+/* A drag across clips used to ask for every clip it passed over, each about 90 MB off the stick, all at once.
+ * Now the playhead follows the pointer and only the clip it is let go on (or a clip already here) is shown. */
+function tlSeek(e, last) {
+    if (making) return;
+    var r = tl.getBoundingClientRect(), t = Math.max(0, Math.min(total - 0.05, (e.clientX - r.left) / r.width * total));
+    pause();
+    if (last || clipAt(t) === cur) { dragT = null; seek(t); } else dragT = t;
+}
+tl.addEventListener('pointerdown', function (e) { if (!D) return; dragging = true; tl.setPointerCapture(e.pointerId); tlSeek(e, false); });
+tl.addEventListener('pointermove', function (e) { if (dragging) tlSeek(e, false); });
+tl.addEventListener('pointerup', function (e) { if (dragging) { dragging = false; tlSeek(e, true); } });
+tl.addEventListener('pointercancel', function () { dragging = false; if (dragT !== null) { var t = dragT; dragT = null; seek(t); } });
 
 document.addEventListener('keydown', function (e) {
     if (making) return;

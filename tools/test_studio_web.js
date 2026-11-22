@@ -92,7 +92,12 @@ const mx = app.slice(app.indexOf('function makeExact('), app.indexOf('function m
 ok('an export that cannot start leaves the page free: nothing is held before the last way out', mx.indexOf('making = ctl') > mx.lastIndexOf("return; }\n    var musicFile") && mx.indexOf('making = ctl') > mx.indexOf('too short to make a clip of') && mx.indexOf('making = ctl') > mx.indexOf('MAX_VIDEO_S'));
 ok('and it always lets go again, whatever happened', /\}\)\.then\(function \(\) \{\n        making = null; hold\(false\);/.test(mx));
 ok('while a video is being made nothing else moves the clip', /function pick\(id\) \{\n    if \(making\) return;/.test(app) && /function seek\(t\) \{\n    if \(making\) return/.test(app) && /function play\(\) \{ if \(making\) return;/.test(app)
-    && /function tlSeek\(e\) \{ if \(making\) return;/.test(app) && /'keydown', function \(e\) \{\n    if \(making\) return;/.test(app));
+    && /function tlSeek\(e, last\) \{\n    if \(making\) return;/.test(app) && /'keydown', function \(e\) \{\n    if \(making\) return;/.test(app));
+ok('a drag along the timeline fetches one clip, not every clip it passes', /if \(last \|\| clipAt\(t\) === cur\) \{ dragT = null; seek\(t\); \} else dragT = t;/.test(app));
+ok('a clip from the car is rewrapped off the page thread, by a worker that loads only the core', /new Worker\('ts-worker\.js'\)/.test(app) && /importScripts\('core\.js'\)/.test(read('ts-worker.js')) && !/\bfetch\(|XMLHttpRequest|WebSocket/.test(read('ts-worker.js')));
+ok('a clip nobody wants any more stops being read', /if \(!live\(\)\) return Promise\.reject\(new Error\('superseded'\)\)/.test(app) && /e\.message !== 'superseded'/.test(app));
+ok('the cameras are buttons, one per view', ['all', 'front', 'rear', 'left', 'right'].every((k) => html.indexOf('data-view="' + k + '"') > 0));
+ok('the chosen drive lists its clips', /list\.className = 'cliplist'/.test(app) && /\.cliplist \{/.test(html));
 ok('a clip that will not open or answer ends the export with a reason, never frozen frames', /a clip could not be read/.test(app) && /a clip stopped answering/.test(app) && /a clip took too long to open/.test(app) && !/setTimeout\(fin, 4000\)/.test(app));
 ok('browsers without the encoders are told what the older way leaves out', /This browser cannot make that kind of clip: this is the whole edit\./.test(app) && /This browser cannot make a Launch clip/.test(app) && /This browser cannot add music: the video is silent\./.test(app) && /e\.code === 'no-encoder'/.test(app) && /none\.code = 'no-encoder'/.test(read('encode.js')));
 ok('long videos and huge music files are turned away before the wait, not after', /job\.dur > MAX_VIDEO_S/.test(app) && /musicFile\.size > MAX_MUSIC_BYTES/.test(app));

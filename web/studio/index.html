@@ -31,6 +31,15 @@ h2:first-child { margin-top: 2px; }
 .item { display: block; width: 100%; text-align: left; margin-bottom: 6px; }
 .item.sel { border-color: var(--accent); }
 .item small { display: block; color: var(--dim); }
+.cliplist { margin: -2px 0 10px 8px; padding-left: 8px; border-left: 2px solid var(--line); max-height: 46vh; overflow-y: auto; }
+.clip { display: flex; justify-content: space-between; gap: 8px; width: 100%; text-align: left; margin-bottom: 3px; padding: 5px 8px; font-size: 13px; }
+.clip small { color: var(--dim); }
+.clip.now { border-color: var(--accent); color: #fff; }
+#views { display: inline-flex; gap: 2px; }
+#views button { padding: 8px 10px; border-radius: 0; }
+#views button:first-child { border-radius: 8px 0 0 8px; }
+#views button:last-child { border-radius: 0 8px 8px 0; }
+#views button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 #stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 #view { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 10px; }
 #pic { max-width: 100%; max-height: 100%; background: #000; border: 1px solid var(--line); }
@@ -85,8 +94,8 @@ h2:first-child { margin-top: 2px; }
     <div id="bar">
       <button id="b-play" class="main" aria-label="Play or pause">Play</button>
       <span id="clock">0:00 / 0:00</span>
-      <label for="s-view" class="help">Camera</label>
-      <select id="s-view"><option value="all">All four</option><option value="front">Front</option><option value="rear">Rear</option><option value="left">Left</option><option value="right">Right</option></select>
+      <span id="views" role="group" aria-label="Camera"><button data-view="all" title="All four cameras (1)">All</button><button data-view="front" title="Front camera (2)">Front</button><button data-view="rear" title="Rear camera (3)">Rear</button><button data-view="left" title="Left camera (4)">Left</button><button data-view="right" title="Right camera (5)">Right</button></span>
+      <select id="s-view" hidden aria-hidden="true" tabindex="-1"><option value="all">All four</option><option value="front">Front</option><option value="rear">Rear</option><option value="left">Left</option><option value="right">Right</option></select>
       <button id="b-in" title="Mark where the piece starts (I)">Mark start</button>
       <button id="b-out" title="Mark where the piece ends (O)">Mark end</button>
       <button id="b-add" title="Add the marked part to the edit (Enter)">Add to edit</button>

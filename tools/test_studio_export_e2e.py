@@ -6,7 +6,7 @@ WEB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 PORT = 8769
 MODE = (sys.argv[1] if len(sys.argv) > 1 else 'video')      # video | music | badmusic | moment | montage
 work = tempfile.mkdtemp(prefix='studio-e2e-')
-for f in ('core.js', 'app.js', 'encode.js', 'social.js'):
+for f in ('core.js', 'app.js', 'encode.js', 'social.js', 'ts-worker.js'):
     shutil.copy(os.path.join(WEB, f), work)
 shutil.copytree(os.path.join(WEB, 'vendor'), os.path.join(work, 'vendor'))
 html = open(os.path.join(WEB, 'index.html'), encoding='utf-8').read()
