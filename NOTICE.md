@@ -6,7 +6,7 @@ Copyright (C) 2026 BimmerApps (https://bimmerapps.com)
 
 Everything in this repository that we wrote is licensed under the
 [GNU General Public License, version 3](LICENSE) or (at your option) any later version (GPL-3.0-or-later): the
-apps under `apps/woodr_*`, `components/`, `tools/`, `docs/`, and the notes in the top folder. In plain words,
+apps under `apps/woodr_*`, `components/`, `web/`, `tools/`, `docs/`, and the notes in the top folder. In plain words,
 which do not replace the licence text:
 
 - You may use it, study it, change it and share it, including changed versions, for any purpose.
@@ -31,6 +31,7 @@ author gave it:
 | `cluster_render_client.js` in several apps | Robert Nisipeanu, [idrive-apps](https://github.com/robertnisipeanu/idrive-apps) | MPL-2.0 |
 | Files derived from the upstream Redline app (they say so in their header) | cauliflowermossgrape | MPL-2.0 |
 | `qrcode.js` | Kazuhiko Arase | MIT |
+| `web/studio/vendor/mp4-muxer.js` | Vanilagy, [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) 5.2.2, unchanged | MIT |
 | `jpeg_decoder.js` | the jpeg-js authors, from Mozilla's pdf.js | Apache-2.0 / BSD-3-Clause (see the file's header) |
 
 A file that carries its own licence header keeps that licence, whatever folder it is in.

@@ -1,0 +1,1615 @@
+{
+ "cases": [
+  {
+   "name": "the spec's example",
+   "in": {
+    "v": 1,
+    "id": "k3f9x2",
+    "name": "Back road, evening",
+    "created": "2026-11-14T19:02:11Z",
+    "updated": "2026-11-14T19:20:40Z",
+    "by": "car",
+    "format": "vertical",
+    "fill": true,
+    "speed": {
+     "show": true,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-11-14 18.41.07",
+      "t0": 12.4,
+      "t1": 31,
+      "view": "front",
+      "rate": 1
+     },
+     {
+      "clip": "2026-11-14 18.41.48",
+      "t0": 0,
+      "t1": 9.5,
+      "view": "all",
+      "rate": 0.5
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "k3f9x2",
+    "name": "Back road, evening",
+    "created": "2026-11-14T19:02:11Z",
+    "updated": "2026-11-14T19:20:40Z",
+    "by": "car",
+    "format": "vertical",
+    "fill": true,
+    "speed": {
+     "show": true,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-11-14 18.41.07",
+      "t0": 12.4,
+      "t1": 31,
+      "view": "front",
+      "rate": 1
+     },
+     {
+      "clip": "2026-11-14 18.41.48",
+      "t0": 0,
+      "t1": 9.5,
+      "view": "all",
+      "rate": 0.5
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "the plain base",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "not an object",
+   "in": "hello",
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "an array",
+   "in": [
+    1,
+    2
+   ],
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "null",
+   "in": null,
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "version 2",
+   "in": {
+    "v": 2,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "parts not a list",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": "x"
+   },
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "id with capitals",
+   "in": {
+    "v": 1,
+    "id": "ABC123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "id too short",
+   "in": {
+    "v": 1,
+    "id": "ab",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "created not a time",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "yesterday",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "updated in local time",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00+01:00",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "two things wrong, two errors",
+   "in": {
+    "v": 3,
+    "id": "!",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": false,
+   "out": null,
+   "errors": 2
+  },
+  {
+   "name": "fractional seconds in a time are fine",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00.123Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00.123Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "unknown by, format, unit and view take the defaults",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "fridge",
+    "format": "imax",
+    "fill": false,
+    "speed": {
+     "show": true,
+     "unit": "knots"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "roof",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": true,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "fill and show are made true or false",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": 1,
+    "speed": {
+     "show": "yes",
+     "unit": "kmh"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": true,
+    "speed": {
+     "show": true,
+     "unit": "kmh"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "missing speed block",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "missing name",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "Edit",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "name of 200 characters cut to 80",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "rate 20 becomes 8",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 20
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 8
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "rate 0 becomes 1",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 0
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "rate 0.01 becomes 0.1",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 0.01
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 0.1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "rate as text becomes 1",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": "fast"
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "a part with a bad clip name is dropped",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     },
+     {
+      "clip": "../../etc/passwd",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 1
+  },
+  {
+   "name": "a part that is not an object is dropped",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     },
+     7
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 1
+  },
+  {
+   "name": "t0 after t1 is dropped",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     },
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 9,
+      "t1": 3,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 1
+  },
+  {
+   "name": "a part shorter than 0.05 s is dropped",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     },
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 1,
+      "t1": 1.04,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 1
+  },
+  {
+   "name": "times as text are dropped",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     },
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": "a",
+      "t1": "b",
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 1
+  },
+  {
+   "name": "negative t0 starts at 0",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": -4,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "times are rounded to 3 places",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 1.23456,
+      "t1": 4.9996,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 1.235,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "no parts at all is a valid, empty edit",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": []
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": []
+   },
+   "errors": 0
+  },
+  {
+   "name": "a time too large to be a time is dropped",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     },
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 1e+306,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 1
+  },
+  {
+   "name": "a rate too large to be a rate becomes 1",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1e+306
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "a time written with more than three decimals",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00.1234567Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": false,
+   "out": null,
+   "errors": 1
+  },
+  {
+   "name": "slashes and control characters leave the name, so it is never a path",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "D:\\Dashcam\\x/y\nz\u0000",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "D:Dashcamxyz",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "a name cut at 80 does not end in half a character",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn😀",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "a name made only of slashes is the default",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "///",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "Edit",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  },
+  {
+   "name": "extra keys are gone, at the top and in a part",
+   "in": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1,
+      "lat": 1.5,
+      "lon": 2.5,
+      "path": "D:\\x"
+     }
+    ],
+    "vin": "TESTVIN",
+    "lat": 1.5,
+    "lon": 2.5,
+    "path": "D:\\x",
+    "drive": "x"
+   },
+   "ok": true,
+   "out": {
+    "v": 1,
+    "id": "abc123",
+    "name": "A",
+    "created": "2026-01-01T00:00:00Z",
+    "updated": "2026-01-02T00:00:00Z",
+    "by": "pc",
+    "format": "original",
+    "fill": false,
+    "speed": {
+     "show": false,
+     "unit": "mph"
+    },
+    "parts": [
+     {
+      "clip": "2026-01-01 10.00.00",
+      "t0": 0,
+      "t1": 5,
+      "view": "all",
+      "rate": 1
+     }
+    ]
+   },
+   "errors": 0
+  }
+ ]
+}

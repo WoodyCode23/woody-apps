@@ -25,6 +25,18 @@ Developer tools, for working on the car and on apps:
 
 Retired on 2026-11-16 and still in the history: `woodr_vitals` and `woodr_live` (Warm-Up HUD, HUD and Diagnostics cover them) and `woodr_ambientlab` (Ambient Studio is what it became).
 
+## Dashcam Studio
+
+`web/studio` is an editor for the dash cam's clips that runs in a browser, on a computer or a phone. Open the folder
+(or the USB stick) the clips are on, cut the parts you want, and it makes a finished video with the speed on it,
+your own music, and ready-made shapes for posting: a single moment, a montage cut to the music's beat, or a
+launch with its lights and timeslip from Launch's data log. Nothing is uploaded: the page reads the files on
+your device and connects to nothing.
+
+Try it from a copy of this repository: `tools\serve_studio_web.cmd` on Windows, or serve `web/studio` with any
+local web server, and open it in Chrome or Edge. Its rules for what an edit is live in `components/studio-core`.
+Tested with one car's clips and in Edge; other browsers fall back to a plainer export.
+
 ## Install
 MGU Store → Settings → Add source → `WoodyCode23/woody-apps` → channel `branch:main` → Check now.
 

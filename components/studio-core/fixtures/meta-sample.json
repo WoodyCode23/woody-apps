@@ -1,0 +1,49 @@
+[
+ {
+  "vin": "TESTVIN",
+  "entries": [
+   {
+    "date": "01.01.2026",
+    "time": "10:00:00",
+    "velocity": 0,
+    "latitude": 1.5,
+    "longitude": 2.5
+   },
+   {
+    "date": "01.01.2026",
+    "time": "10:00:01",
+    "velocity": 10,
+    "latitude": 1.5,
+    "longitude": 2.5
+   },
+   {
+    "date": "01.01.2026",
+    "time": "10:00:02",
+    "velocity": 20,
+    "latitude": 1.5,
+    "longitude": 2.5
+   },
+   {
+    "date": "01.01.2026",
+    "time": "10:00:03",
+    "velocity": 30,
+    "latitude": 1.5,
+    "longitude": 2.5
+   },
+   {
+    "date": "01.01.2026",
+    "time": "10:00:04",
+    "velocity": 40,
+    "latitude": 1.5,
+    "longitude": 2.5
+   },
+   {
+    "date": "01.01.2026",
+    "time": "10:00:05",
+    "velocity": 50,
+    "latitude": 1.5,
+    "longitude": 2.5
+   }
+  ]
+ }
+]
