@@ -1,8 +1,9 @@
 # Wheel gate: the steering wheel's menu button and roller, kept from the car's own interface
 
-A build of the kit's controller gate (`mgu-inputgate.so`, MIT) with one addition. Since 2026-11-17 it is built on
-the gate's version 1.2.0 (cauliflowermossgrape/idrive7-apps, `kit/renderd/inputgate/mgu-inputgate.cpp` at commit
-`eb1ed8cd`, which lets an app hold only the knob, the press or the tilt); before that on 1.1.0, the copy in
+A build of the kit's controller gate (`mgu-inputgate.so`, MIT) with one addition. Since 2026-11-22 it is built on
+the gate's version 1.2.1 (cauliflowermossgrape/idrive7-apps, `kit/renderd/inputgate/mgu-inputgate.cpp` at commit
+`a387abaa`, which keeps the knob right after the car re-centres it); from 2026-11-17 on 1.2.0 (`eb1ed8cd`), before
+that on 1.1.0, the copy in
 `woody-apps/kit/renderd/inputgate/`. It replaces the stock gate, so it has to be rebuilt whenever the stock gate
 changes: a 1.1.0-based build must not be put back under a newer set of renderers. The kit's file with one
 addition. The controller gate is unchanged. The addition lets an app's menu on the head-up display use the wheel's
@@ -54,7 +55,7 @@ the press; if the instrument cluster maps it by itself, this gate cannot stop it
 | File | What |
 |---|---|
 | `mgu-inputgate.cpp` | the source: the kit's file plus the parts marked "wheel gate" |
-| `prebuilt/mgu-inputgate.so` | built from it on 1.2.0; sha256 `0ab3175ba9331ee6c74b3930d6870a4ecf864364de0f879a39ca08a5b8fa6ecc`, 19168 bytes. (The 1.1.0-based build that was on the car until 2026-11-17: `ff235729355f367493768a0cb505303ec0e86cd2b6048019c132d2fc5efaf9b6`, 19088 bytes, in this folder's history.) |
+| `prebuilt/mgu-inputgate.so` | built from it on 1.2.1; sha256 `cb9c583ca7d1d8dfd6a7f292dba2746d4e742d960fc47f77edfd8915b365c6dc`, 19480 bytes. (Earlier builds, not to be used under a newer stock gate: on 1.2.0 `0ab3175ba9331ee6c74b3930d6870a4ecf864364de0f879a39ca08a5b8fa6ecc`; on 1.1.0 `ff235729...`.) |
 | `test/` | a harness that runs the library the way the interface would |
 
 ## Build and test (Ubuntu 18.04, the unit's glibc)
@@ -68,6 +69,13 @@ docker run --rm -v "$PWD":/src ubuntu:18.04 bash -c '
   g++ -std=c++14 -O1 $I -o gate_test test/test.cpp -L. -lreal &&
   LD_PRELOAD=./mgu-inputgate.so LD_LIBRARY_PATH=. ./gate_test'
 ```
+
+Checked on 2026-11-22 for the 1.2.1-based build, g++ 7.5.0, same command: the stock 1.2.1 source builds to sha256
+`56cd02ab5bd6e827ff151f2d24669e089dffad03ab663585c9da59d6d9c750eb` (18848 bytes), byte for byte the file upstream
+ships; the additions merged with the same one overlap (constants, both sides kept) and the same single changed
+line; `gate_test` passes with this build and its wheel checks fail against the stock 1.2.1; same four libraries,
+nothing newer than glibc 2.17. The test does not exercise 1.2.1's new re-centre code, which is upstream's own
+and unchanged. NOT yet run on the car.
 
 Checked on 2026-11-17 for the 1.2.0-based build, g++ 7.5.0, same command:
 - The stock 1.2.0 source, unchanged and under its own file name, builds to sha256 `79810f8c...fc56f7`, byte for
@@ -98,7 +106,7 @@ interface's service, with a boot guard that leaves the gate out after two starts
 did not stay up for a minute.
 
 1. Check `sha256sum` of the file here against the value above, and of the one on the car against the stock
-   build of the same version (1.2.0: `79810f8c...fc56f7`; 1.1.0: `64efa96f...`). If the car's stock gate is a
+   build of the same version (1.2.1: `56cd02ab...c750eb`; 1.2.0: `79810f8c...fc56f7`; 1.1.0: `64efa96f...`). If the car's stock gate is a
    version this was not built on, stop: rebuild first.
 2. Keep the car's current file (its version folder stays as it is). Put this one in a new version folder beside
    it and point `current` at it, the way the installer does. Do not restart the interface or any unit by hand.
@@ -114,6 +122,6 @@ did not stay up for a minute.
    user, the car must react to the button as if there were no gate.
 6. Back out: point `current` at the stock version's folder again; it is gone at the next head-unit start. The
    Store updating the gate tool also replaces it with the stock build (that happened on 2026-11-17, 1.1.0 to
-   1.2.0), and the wheel then opens the car's own list again until this is rebuilt and put back. The boot guard
+   1.2.0, and again on 2026-11-22, to 1.2.1), and the wheel then opens the car's own list again until this is rebuilt and put back. The boot guard
    starts its count again for a new version folder, and leaves the gate out after two starts that did not come
    up healthy.
