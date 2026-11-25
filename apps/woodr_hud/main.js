@@ -30,7 +30,7 @@ const { Canvas, withAlpha } = require('./kit/canvas');
 const { Wheel } = require('./wheel');
 const { Waze } = require('./waze');
 const { Song } = require('./song');
-const { SEEN, MARKS, MARK_LABEL, MARKBAR, markAt, markStep, drawMark, GEAR, gearText, drawGear, coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
+const { Smooth, barDirty, rowsOf, SEEN, MARKS, MARK_LABEL, MARKBAR, markAt, markStep, drawMark, GEAR, gearText, drawGear, coldZones, drawBar, barFill, drawSong, drawCard, CARD, PLACES } = require('./strip');
 const shared = require('./shared');
 const fs = require('fs');
 const path = require('path');
@@ -374,6 +374,9 @@ async function background(bg) {
         if (note !== zoneNote) { zoneNote = note; log.info('rev bar: ' + note); }
         return z;
     }
+    /* the zones for the bar, looked up once a second: the bar is drawn far more often than they can change */
+    let zoneAt = 0, zoneNow = null;
+    function zonesNow() { const t = Date.now(); if (!zoneNow || t - zoneAt > 1000) { zoneNow = zones(); zoneAt = t; } return zoneNow; }
     function stageOf(rpm) {
         const z = zones(), g = z.green, y = z.yellow, r = z.red, s = z.shift;
         if (rpm >= s) return 'flash';
@@ -402,25 +405,33 @@ async function background(bg) {
 
     /* ---------- rev bar and song line ---------- */
     const place = () => PLACES[settings.get('place') === 'slot' ? 'slot' : 'top'];
+    const BAR_FPS = 30, BAR_MS = 33;
+    let barZone = '', barFilled = -1;
+    let barWant = null;          /* what the bar should show now: { test: rpm or null, flash }, or null for no bar */
+    const smooth = new Smooth();
+    let rateSaid = 0;
     function hideBar() { if (barLayer && cr) { cr.drop(barLayer); } barLayer = 0; barKey = ''; barGeom = ''; barVisible = false; }
     function showBar(rpm, blink) {
         /* the band with its numbers; where the song is shown as a line in the row above it, the band alone */
         const p = place(), g = p.barSlim && settings.get('song') !== false && settings.get('songLook') === 'line' ? p.barSlim : p.bar, geom = JSON.stringify(g);
         if (geom !== barGeom) { hideBar(); barGeom = geom; }
         if (!barLayer) {
-            barLayer = cr.image({ target: 'hud', klass: 'overlay', z: 7, x: g.x, y: g.y, w: g.w, h: g.h, iw: g.w, ih: g.h, fps: 8, sampling: 'nearest' });
+            barLayer = cr.image({ target: 'hud', klass: 'overlay', z: 7, x: g.x, y: g.y, w: g.w, h: g.h, iw: g.w, ih: g.h, fps: BAR_FPS, sampling: 'nearest' });
             if (!barLayer) { log.warn('rev bar layer refused'); barGeom = ''; return; }
-            barVisible = true;
+            barVisible = true; barZone = ''; barFilled = -1;
         }
         const filled = barFill(g.w, g.h, rpm);
-        const z = zones(), key = filled + '|' + z.yellow + '|' + z.red;
+        const z = zonesNow(), zone = z.yellow + '|' + z.red, key = filled + '|' + zone;
         if (key !== barKey) {
             const cv = new Canvas(g.w, g.h);
             drawBar(cv, g.w, g.h, filled, { yellow: z.yellow, red: z.red });
-            cr.pixels(barLayer, null, Buffer.from(cv.d.buffer || cv.d));
-            barKey = key;
+            /* the whole picture the first time and when the zones move; after that only the part between the old
+             * fill and the new one, which is what lets it be drawn 30 times a second */
+            const part = zone === barZone && barFilled >= 0 ? barDirty(g.w, g.h, barFilled, filled) : null;
+            if (!part || !cr.pixels(barLayer, [part], rowsOf(cv.d, g.w, part))) cr.pixels(barLayer, null, Buffer.from(cv.d.buffer || cv.d));
+            barKey = key; barZone = zone; barFilled = filled;
         }
-        const want = blink ? !barVisible : true;
+        const want = blink ? Math.floor(Date.now() / 120) % 2 === 0 : true;
         if (want !== barVisible) { cr.set(barLayer, { visible: want }); barVisible = want; }
     }
     function hideSong() { if (songLayer && cr) { cr.drop(songLayer); } songLayer = 0; songKey = ''; }
@@ -520,12 +531,12 @@ async function background(bg) {
             if (settings.get('style') !== 'frame') {
                 /* the rev bar: shown whenever the engine runs, whatever the stage; the old frame stays away */
                 hideFrame();
-                if (!running || (!st.shiftOn && testLeft <= 0)) { hideBar(); return; }
-                const shown = testLeft > 0 ? [7000, 6500, 5800, 4500, 3000][Math.floor(testLeft / 1500)] || 3000 : rpm;
-                showBar(shown, stage === 'flash');
+                if (!running || (!st.shiftOn && testLeft <= 0)) { barWant = null; hideBar(); return; }
+                /* the bar itself is drawn by barTimer, 30 times a second: here it is only told what to show */
+                barWant = { test: testLeft > 0 ? [7000, 6500, 5800, 4500, 3000][Math.floor(testLeft / 1500)] || 3000 : null, flash: stage === 'flash' };
                 return;
             }
-            hideBar();
+            barWant = null; hideBar();
             if (!stage) { hideFrame(); return; }
             placeFrame(st.box, COLOURS[stage === 'flash' ? 'red' : stage]);
             if (stage === 'flash') { flashOn = !flashOn; cr.set(frameLayer, { visible: flashOn }); frameVisible = flashOn; }
@@ -533,10 +544,22 @@ async function background(bg) {
         } catch (e) { log.warn('shift: ' + e); }
     }, 120);
 
+    /* the rev bar, as often as the display takes it: the latest engine speed, carried on between the car's reports */
+    const barTimer = setInterval(() => {
+        try {
+            if (!cr || !barWant) return;
+            const d = car.data ? car.data() : car.live, now = Date.now();
+            const rpm = d && typeof d.rpm === 'number' ? d.rpm : null;
+            if (barWant.test === null && rpm === null) return;
+            showBar(barWant.test !== null ? barWant.test : smooth.at(rpm, now, zonesNow().shift), barWant.flash);
+            if (smooth.n >= 200 && now - rateSaid > 600000) { rateSaid = now; log.info('rev bar: the car reports engine speed every ' + Math.round(smooth.every) + ' ms, drawn ' + BAR_FPS + ' times a second'); }
+        } catch (e) { log.warn('rev bar: ' + e); }
+    }, BAR_MS);
+    if (barTimer.unref) barTimer.unref();
     const wazeTimer = setInterval(() => { waze.poll().then(() => { st.box = waze.hudBox(); syncSize(); }).catch(() => {}); }, 15000);
     waze.poll().then(() => { st.box = waze.hudBox(); }).catch(() => {});
 
-    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, wazeTimer, markTimer].forEach(clearInterval); if (markLayer && cr) { try { cr.drop(markLayer); } catch (e) { /* going */ } } closeMenu(); hideFrame(); hideBar(); hideSong(); hideGear(); hideClusterSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
+    process.on('exit', () => { [menuTimer, gateTimer, shiftTimer, barTimer, wazeTimer, markTimer].forEach(clearInterval); if (markLayer && cr) { try { cr.drop(markLayer); } catch (e) { /* going */ } } closeMenu(); hideFrame(); hideBar(); hideSong(); hideGear(); hideClusterSong(); if (cr) { try { cr.close(); } catch (e) { /* going */ } } });
     return { st: st, items: items, waze: waze, pick: pick, act: act, song: song };
 }
 

@@ -16,13 +16,13 @@ const PLACES = {
 
 /* The rev bar is one band leaning to the right, cut by a thin gap at every 1000 rpm, with the numbers 1 to 7
  * over the gaps when the layer is tall enough for them. */
-const LEAN = 0.5, STEP = 3, NUM = 12, YELLOW = '#ffd34d', RED_TRACK = '#4a1220', NUM_DIM = '#8d8e96';
+const LEAN = 0.5, STEP = 1, NUM = 12, YELLOW = '#ffd34d', RED_TRACK = '#4a1220', NUM_DIM = '#8d8e96';
 function band(w, h) {
     const tall = h >= 28, y0 = tall ? NUM + 5 : 2, y1 = h - 1, lean = Math.round((y1 - y0) * LEAN);
     return { tall: tall, y0: y0, y1: y1, lean: lean, span: w - lean - 1 };
 }
 
-/** how far the band is filled at `rpm`, in pixels, in steps of STEP so that it is drawn again no more often than it has to be */
+/** how far the band is filled at `rpm`, in whole pixels: it is drawn again only when that changes */
 function barFill(w, h, rpm) {
     const f = Number(rpm) / RPM_FULL, b = band(w, h);
     return Math.round((f > 0 ? (f < 1 ? f : 1) : 0) * b.span / STEP) * STEP;
@@ -65,6 +65,46 @@ function drawBar(cv, w, h, fill, zones) {
         if (n % 2) { if (b.tall) cv.fillRect(Math.round(x + b.lean), b.y0 - 4, 1, 3, rpm >= red ? ACCENT : NUM_DIM); continue; }
         slab(x - 1, x + 1, '#000000');
         if (b.tall) cv.text(String(n / 2), x + b.lean + 1, NUM, NUM, rpm >= red ? ACCENT : rpm <= shown ? '#ffffff' : NUM_DIM, { font: 'bold', align: 'center', literal: true });
+    }
+}
+
+/** the part of the bar's picture that can differ between two fills: the columns between them, with room for the
+ * lean, the bright leading edge and a number changing colour as it is passed. Only this goes to the display. */
+function barDirty(w, h, was, now) {
+    const b = band(w, h), lo = Math.max(0, Math.min(was, now) - 16), hi = Math.min(w, Math.max(was, now) + b.lean + 16);
+    return { x: lo, y: 0, w: hi - lo, h: h };
+}
+/** the rows of rectangle r out of a picture w wide (4 bytes a pixel), one after another */
+function rowsOf(d, w, r) {
+    const out = Buffer.alloc(r.w * r.h * 4);
+    for (let y = 0; y < r.h; y++) { const a = ((r.y + y) * w + r.x) * 4; Buffer.from(d.buffer, d.byteOffset + a, r.w * 4).copy(out, y * r.w * 4); }
+    return out;
+}
+
+/**
+ * The engine speed to draw. The car reports it some 10 to 20 times a second and the bar is drawn 30 times, so
+ * between two reports the bar carries on along the way the revs were going, and a new report replaces the guess.
+ * (The idea is Redline's, cauliflowermossgrape/idrive7-apps.) It never guesses past `max`, never for longer than
+ * about one report's time, never from a jump too big to be real, and not when the revs are near enough steady.
+ * `every` is the measured time between reports in ms, for the log.
+ */
+class Smooth {
+    constructor() { this.r = null; this.t = 0; this.rate = 0; this.every = 0; this.n = 0; }
+    at(rpm, now, max) {
+        if (typeof rpm !== 'number' || !isFinite(rpm)) { this.r = null; return rpm; }
+        if (rpm !== this.r || now - this.t >= 500) {
+            const dt = now - this.t, near = this.r !== null && dt > 15 && dt < 300;
+            this.rate = near ? (rpm - this.r) * 1000 / dt : 0;
+            if (Math.abs(this.rate) > 8000) this.rate = 0;
+            if (near) { this.every = this.every ? this.every * 0.95 + dt * 0.05 : dt; this.n++; }
+            this.r = rpm; this.t = now;
+            return rpm;
+        }
+        const win = Math.min(this.every ? this.every * 1.2 : 100, 150);
+        if (Math.abs(this.rate) < 200 || now - this.t > win) return rpm;
+        const top = Math.max(rpm, typeof max === 'number' ? max : RPM_FULL);
+        const est = Math.round(rpm + this.rate * (now - this.t) / 1000);
+        return Math.max(0, Math.min(top, est));
     }
 }
 
@@ -213,4 +253,4 @@ function drawMark(cv, w, h, at, note, kind) {
     for (let i = 0; i < MARKS.length; i++) cv.roundRect(Math.round(x0 + i * gap - 3), 50, 6, 4, 2, i === at ? ACCENT : '#3a3d47');
 }
 
-module.exports = { SEEN: SEEN, drawIcon: drawIcon, MARKS: MARKS, MARK_LABEL: MARK_LABEL, MARKBAR: MARKBAR, markAt: markAt, markStep: markStep, drawMark: drawMark, GEAR: GEAR, gearText: gearText, drawGear: drawGear, coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };
+module.exports = { Smooth: Smooth, barDirty: barDirty, rowsOf: rowsOf, SEEN: SEEN, drawIcon: drawIcon, MARKS: MARKS, MARK_LABEL: MARK_LABEL, MARKBAR: MARKBAR, markAt: markAt, markStep: markStep, drawMark: drawMark, GEAR: GEAR, gearText: gearText, drawGear: drawGear, coldZones: coldZones, drawCard: drawCard, CARD: CARD, COVER: COVER, drawBar: drawBar, barFill: barFill, drawSong: drawSong, PLACES: PLACES, RPM_FULL: RPM_FULL, WHITE: WHITE, OFF: OFF, ACCENT: ACCENT };

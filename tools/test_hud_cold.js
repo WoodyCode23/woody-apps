@@ -52,5 +52,41 @@ ok('sighting: each kind has a sign that stays inside its box, and the bar draws 
 ok('sighting: the rows show only while Scout says its box takes them, right under Highlight', /const seen = mk\.sight \? SEEN\.map\(/.test(hudMain) && /mk\.sight = !!\(m && m\.sighting === true\);/.test(hudMain) && hudMain.indexOf(".concat(seen)") < hudMain.indexOf(".concat(groups.map("));
 ok('sighting: only the choice is handed over, and the menu gets out of the way', /shared\.write\('hud\.scoutmark\.json', \{ n: mk\.sent, sighting: true, as: as \}\)/.test(hudMain) && /if \(!mk\.sight \|\| SEEN\.indexOf\(as\) < 0\)/.test(hudMain) && /log\.info\('sighting: ' \+ as\);\n        closeMenu\(\);/.test(hudMain.replace(/\r\n/g, '\n')));
 
+/* ---- the rev bar drawn 30 times a second: only the changed part is sent, and the revs carry on between reports */
+const { Canvas } = require(path.join(__dirname, '..', 'kit', 'runtime', 'canvas'));
+ok('rev bar: sending only the changed part gives the same picture as sending all of it, whichever way the revs go', (() => {
+    const W = 562, H = 30, zs = { yellow: 5500, red: 6300 };
+    const pic = (fill) => { const cv = new Canvas(W, H); S.drawBar(cv, W, H, fill, zs); return cv.d; };
+    const fills = [0, 1, 2, 40, 41, 43, 70, 68, 139, 141, 300, 299, 372, 380, 520, 545, 544, 60, 0];
+    let shown = Buffer.from(pic(fills[0]));
+    for (let i = 1; i < fills.length; i++) {
+        const now = pic(fills[i]), r = S.barDirty(W, H, fills[i - 1], fills[i]), rows = S.rowsOf(now, W, r);
+        if (rows.length !== r.w * r.h * 4 || r.x < 0 || r.x + r.w > W) return false;
+        for (let y = 0; y < r.h; y++) rows.copy(shown, ((r.y + y) * W + r.x) * 4, y * r.w * 4, (y + 1) * r.w * 4);
+        if (Buffer.compare(shown, Buffer.from(now)) !== 0) return false;
+    }
+    return S.barDirty(W, H, 100, 101).w < 80;
+})());
+ok('rev bar: between two reports it carries on along the climb, and a new report replaces the guess', (() => {
+    const m = new S.Smooth();
+    m.at(3000, 1000, 6800); m.at(3200, 1060, 6800);                 /* 200 rpm in 60 ms */
+    const mid = m.at(3200, 1090, 6800), next = m.at(3350, 1120, 6800);
+    return mid > 3250 && mid < 3350 && next === 3350;
+})());
+ok('rev bar: it never guesses past the limit, for long, from a glitch, or when the revs are steady', (() => {
+    const a = new S.Smooth(); a.at(6500, 1000, 6800); a.at(6790, 1060, 6800);
+    const capped = a.at(6790, 1100, 6800) <= 6800;
+    const b = new S.Smooth(); b.at(3000, 1000, 6800); b.at(3200, 1060, 6800);
+    const stale = b.at(3200, 1400, 6800) === 3200;
+    const c = new S.Smooth(); c.at(1000, 1000, 6800); c.at(6000, 1050, 6800);
+    const glitch = c.at(6000, 1080, 6800) === 6000;
+    const d = new S.Smooth(); d.at(2000, 1000, 6800); d.at(2005, 1060, 6800);
+    const steady = d.at(2005, 1090, 6800) === 2005;
+    const e = new S.Smooth(); e.at(5000, 1000, 6800); e.at(4700, 1060, 6800);
+    const falling = e.at(4700, 1090, 6800) < 4700 && e.at(4700, 1090, 6800) >= 0;
+    return capped && stale && glitch && steady && falling && new S.Smooth().at(null, 1, 1) === null;
+})());
+ok('rev bar: the bar has its own timer at 30 a second and the slower one only says what to show', /const BAR_FPS = 30, BAR_MS = 33;/.test(hudMain) && /fps: BAR_FPS/.test(hudMain) && /barWant = \{ test: /.test(hudMain) && /\}, BAR_MS\);/.test(hudMain) && !/fps: 8, sampling/.test(hudMain));
+
 console.log(failed ? 'FAILED: ' + failed : 'all ok');
 process.exit(failed ? 1 : 0);
