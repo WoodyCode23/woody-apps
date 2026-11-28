@@ -3,14 +3,15 @@
  * link.js - the app's side of components/woodr-link/helper.js.
  *
  * /run/woodr-link/link.sock, one JSON object per line each way. The helper sends its whole state on connect,
- * after each request and whenever it changes. The four requests are all there is: status, connect, disconnect,
- * logout. Nothing here (or anywhere in the app) can change what Tailscale is allowed to do on the car.
+ * after each request and whenever it changes. The requests are all there is: status, connect, disconnect, logout,
+ * and asking for SSH on or off. Whether SSH opens is the helper's decision, from the tailnet's own rules; nothing
+ * here (or anywhere in the app) can change what Tailscale is allowed to do on the car.
  */
 const net = require('net');
 const EventEmitter = require('events');
 
 const SOCK = process.env.WOODR_LINK_SOCK || '/run/woodr-link/link.sock';
-const EMPTY = Object.freeze({ daemon: false, backend: 'unknown', authUrl: '', name: '', tailnet: '', ips: [], online: false, health: [], version: '', policy: 'unknown', note: '' });
+const EMPTY = Object.freeze({ daemon: false, backend: 'unknown', authUrl: '', name: '', tailnet: '', ips: [], online: false, health: [], version: '', policy: 'unknown', note: '', ssh: 'off', sshWhy: '' });
 
 class Link extends EventEmitter {
     constructor(path) {
@@ -63,6 +64,8 @@ class Link extends EventEmitter {
     connect() { return this._send('connect'); }
     disconnect() { return this._send('disconnect'); }
     logout() { return this._send('logout'); }
+    sshOn() { return this._send('ssh-on'); }
+    sshOff() { return this._send('ssh-off'); }
 
     stop() { this.closed = true; clearTimeout(this.timer); this.timer = null; if (this.sock) { this.sock.destroy(); this.sock = null; } }
 }

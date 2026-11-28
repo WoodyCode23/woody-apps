@@ -4,3 +4,4 @@
 *.pack binary
 *.ttf binary
 *.so binary
+components/woodr-link/bin/tailscaled binary

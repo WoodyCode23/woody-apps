@@ -1,18 +1,22 @@
-# Tailscale's daemon for Woody Link (components/woodr-link). Userspace networking: no tun device, no change to the
-# head unit's routes, firewall or DNS, and no proxy, so nothing on the head unit can reach the tailnet through it.
-# What it may do is held to the car policy by woodr-link-helper.service (helper.js).
+# Tailscale's daemon for Woody Link (components/woodr-link). Userspace networking: no tun device (the head unit's
+# kernel has none), no change to the head unit's routes, firewall or DNS, and no proxy, so nothing on the head unit
+# can reach the tailnet through it. It runs as its own user, uid 3921, which is the uid mgu-uplink gives the internet
+# to (component.json "internet"); root gets none through the uplink. Its control socket is in a folder only that
+# user (and root, the helper) can open. What it may do is held to the car policy by woodr-link-helper.service.
 [Unit]
-Description=Woody Link: Tailscale daemon (userspace, shields up)
+Description=Woody Link: Tailscale daemon (userspace, held to the car policy)
 After=network.target
 RequiresMountsFor=/var/opt
-ConditionPathExists=/var/opt/woodr-link/bin/tailscaled
 
 [Service]
-User=root
-RuntimeDirectory=woodr-link
-RuntimeDirectoryMode=0755
-RuntimeDirectoryPreserve=yes
-ExecStart=/var/opt/woodr-link/bin/tailscaled --tun=userspace-networking --statedir=/var/opt/woodr-link/state --socket=/run/woodr-link/tailscaled.sock --no-logs-no-support
+User=3921
+Group=3921
+Environment=HOME=/var/opt/woodr-link/state
+RuntimeDirectory=woodr-link-ts
+RuntimeDirectoryMode=0700
+# as root ("+"): the login's folder, the daemon's own and nobody else's
+ExecStartPre=+/bin/sh -c 'mkdir -p /var/opt/woodr-link/state && chown 3921:3921 /var/opt/woodr-link/state && chmod 0700 /var/opt/woodr-link/state'
+ExecStart=/var/opt/woodr-link/current/bin/tailscaled --tun=userspace-networking --statedir=/var/opt/woodr-link/state --socket=/run/woodr-link-ts/tailscaled.sock --no-logs-no-support
 Restart=on-failure
 RestartSec=10
 Nice=10

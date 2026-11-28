@@ -1,8 +1,8 @@
 {
   "id": "woodr_link",
   "title": "Link",
-  "description": "Puts the car on your own Tailscale network, locked down: shields up, no exit node, no routes, no SSH. You log in on your phone with a QR code; the car never sees a password. Needs the Link service.",
-  "version": "0.1.1",
+  "description": "Puts the car on your own Tailscale network, locked down: no exit node, no routes, and SSH from your own devices only when you turn it on and your tailnet allows nothing but port 22. You log in on your phone with a QR code; the car never sees a password. Needs the Link service.",
+  "version": "0.2.0",
   "vendor": "custom",
   "loggingId": "OAB3",
   "iconGlyph": "live_data",
@@ -23,6 +23,10 @@
         [
           "BTN_LOGOUT",
           "Log out"
+        ],
+        [
+          "BTN_SSH",
+          "SSH on / off"
         ],
         [
           "BTN_SETTINGS",

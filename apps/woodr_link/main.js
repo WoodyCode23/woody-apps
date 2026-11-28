@@ -98,6 +98,19 @@ mgu.run({
             say(link.logout() ? 'Logged out' : 'The service did not answer', 5);
         }
 
+        /* SSH from the owner's own devices: two presses to ask for it, one to stop. The helper opens it only when
+         * the tailnet's rules allow nothing but port 22, and says why when it will not. */
+        let sshArmed = 0;
+        function ssh() {
+            const s = link.state;
+            if (!link.up || !s.daemon) { say('The service is not running', 4); return; }
+            if (s.ssh === 'on' || s.ssh === 'blocked') { say(link.sshOff() ? 'SSH off' : 'The service did not answer', 4); return; }
+            const now = Date.now();
+            if (now > sshArmed) { sshArmed = now + CONFIRM_MS; say('Press again to let your own devices reach this car by SSH', 4); return; }
+            sshArmed = 0;
+            say(link.sshOn() ? 'SSH asked for: checking your tailnet\'s rules' : 'The service did not answer', 5);
+        }
+
         function rule(cv, t, x, y, label, value, colour) {
             cv.text(label, x, y, 20, t.dim);
             cv.text(value, x, y + 34, 28, colour || t.text, { font: 'bold' });
@@ -127,12 +140,19 @@ mgu.run({
                 }
                 if (v.action) button(cv, t, 470, 350, 320, 76, v.action === 'connect' ? 'Connect' : 'Disconnect', v.action === 'connect' ? t.accent : t.dim, 'act', act);
                 if (s.daemon && s.backend !== 'NeedsLogin') button(cv, t, 820, 350, 320, 76, Date.now() < armed ? 'Press again' : 'Log out', Date.now() < armed ? AMBER : t.dim, 'logout', logout);
+                if (v.key === 'on') {
+                    const asked = s.ssh === 'on' || s.ssh === 'blocked';
+                    button(cv, t, 1170, 350, 320, 76, asked ? 'SSH off' : Date.now() < sshArmed ? 'Press again' : 'SSH on', s.ssh === 'on' ? GREEN : Date.now() < sshArmed || s.ssh === 'blocked' ? AMBER : t.dim, 'ssh', ssh);
+                    if (s.ssh === 'on') cv.text('SSH open to your devices, port 22 only', 1170, 448, 20, GREEN);
+                    else if (s.ssh === 'blocked') cv.text(('SSH held shut: ' + (s.sshWhy || 'checking')).slice(0, 64), 470, 448, 20, AMBER);
+                }
             }
 
             /* the policy line: what this car will and will not do on the tailnet, and whether the helper confirms it */
             if (link.up && s.daemon && settings.get('hints') !== false) {
                 const ok = s.policy === 'ok' || s.policy === 'enforced';
-                cv.text(ok ? 'Locked down: shields up, no exit node, no routes, no SSH' : 'Policy not confirmed: ' + s.policy, W - 24, 80, 20, ok ? t.dim : t.warn, { align: 'right' });
+                const lock = s.ssh === 'on' ? 'Locked down: SSH only, no exit node, no routes' : 'Locked down: shields up, no exit node, no routes, no SSH';
+                cv.text(ok ? lock : 'Policy not confirmed: ' + s.policy, W - 24, 80, 20, ok ? t.dim : t.warn, { align: 'right' });
             }
             const y = 492 + G.pageBottom(cv) - G.BOTTOM;
             const noted = Date.now() < noteUntil && note;
@@ -146,6 +166,7 @@ mgu.run({
 
         ui.onClick('BTN_ACTION', () => { act(); return render(); });
         ui.onClick('BTN_LOGOUT', () => { logout(); return render(); });
+        ui.onClick('BTN_SSH', () => { ssh(); return render(); });
         settings.onChange(() => refresh());
         link.on('change', () => refresh());
         link.start();

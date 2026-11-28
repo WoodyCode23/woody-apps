@@ -9,7 +9,7 @@ Apps for a 2022 BMW G80 M3 (iDrive 7 / MGU), installed over Wi-Fi from the
 | `woodr_dashcam` | Dashcam: the car's own drive recorder as a loop dash cam, clips kept on the car and copied to a USB stick, highlights that are never removed to make room |
 | `woodr_hud` | HUD: a menu on the head-up display worked from the steering wheel, a rev bar with a shift point, and the song that is playing |
 | `woodr_diag` | Diagnostics: fault memory and live values, read-only |
-| `woodr_link` | Link: the car on your own Tailscale network, locked down |
+| `woodr_link` | Link: the car on your own Tailscale network, locked down, with SSH from your own devices when you turn it on |
 | `woodr_warmhud` | Warm-Up HUD: warm-up on the head-up display (oil, then the gearbox, then the tyres), then it turns itself off. With HUD, the rev bar's red starts lower while the oil is cold |
 | `woodr_ambient` | Ambient Studio: your ambient light, built on the car's own colours and brightness |
 | `woodr_hass` | Home Assistant, both ways, through [Car Relay](https://github.com/WoodyCode23/car-relay): your own tiles on the centre screen (doors, locks, lights, scenes, any service you choose), the doorbell camera on the cluster, and the car's readings as sensors in Home Assistant. Set up from your phone by QR while it is on wireless CarPlay, or on the car's own keyboard; no Home Assistant token on the car |
@@ -72,7 +72,7 @@ makes the package.
 | Component | For | Without it |
 |---|---|---|
 | `woodr-dashkeep` | Dashcam: keeps clips on the car and clears the oldest when its space is used | Dashcam still saves clips and copies them to a stick |
-| `woodr-link` | Link: holds Tailscale to the car policy | Link shows that its service is missing |
+| `woodr-link` | Link: Tailscale's daemon, held to the car policy. Installs from the Store as the tool "Woody Link service" | Link shows that its service is missing |
 | `woodr-wheelgate` | HUD: keeps the wheel's menu button and roller from opening the car's own list while HUD's menu is up. Installs from the Store as the tool "Wheel gate", beside the stock controller gate | HUD works; the car's list opens alongside it |
 
 Installing one (done this way for `woodr-dashkeep` on one car; the other two have only been placed by hand):

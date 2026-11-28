@@ -24,6 +24,15 @@
       "optional": true,
       "uninstallable": true,
       "mguHmi": ["ID7"]
+    },
+    {
+      "id": "woodr-link",
+      "path": "components/woodr-link",
+      "title": "Woody Link service",
+      "description": "Tailscale for the car, locked down, for the Link app; SSH from your own devices only when you turn it on (iDrive 7)",
+      "optional": true,
+      "uninstallable": true,
+      "mguHmi": ["ID7"]
     }
   ]
 }

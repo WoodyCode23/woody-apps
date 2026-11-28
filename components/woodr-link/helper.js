@@ -2,8 +2,8 @@
 /**
  * helper.js - the only thing on the head unit that may steer Tailscale (woodr-link-helper.service, root).
  *
- * Tailscale's own daemon (tailscaled, fetched from pkgs.tailscale.com by fetch-tailscale.sh, BSD-3-Clause) runs
- * beside this as woodr-link.service. It can do far more than a car should: act as an exit node, route a subnet,
+ * Tailscale's own daemon (tailscaled, Tailscale's published release checked against its pinned checksum by
+ * update-tailscale.sh, BSD-3-Clause) runs beside this as woodr-link.service, as its own user (uid 3921), not root. It can do far more than a car should: act as an exit node, route a subnet,
  * serve SSH, take the car's DNS. Apps therefore never talk to it. They talk to this helper, which offers four
  * requests and nothing else, and which puts the daemon's settings back to the car policy whenever they differ:
  *
@@ -11,6 +11,7 @@
  *     connect                        log in (the daemon gives a link, the app shows it as a QR) or come back up
  *     disconnect                     stay logged in, go off the tailnet
  *     logout                         forget the login
+ *     ssh-on / ssh-off               let the owner's own devices reach the head unit's SSH (see "SSH" below)
  *
  * The car policy (POLICY below), enforced on every poll:
  *     shields up        nothing on the tailnet can open a connection to the head unit
@@ -19,8 +20,19 @@
  *     no Tailscale DNS  the head unit's name lookups stay as BMW set them
  *     no Tailscale SSH
  * The daemon runs in userspace-networking mode with no proxy, so the car's own network settings are never
- * touched and no program on the head unit can reach the tailnet through it. Until a later feature opens
- * something on purpose, a connected car is simply present on the owner's tailnet.
+ * touched and no program on the head unit can reach the tailnet through it.
+ *
+ * SSH (off until asked for, and kept off unless the tailnet's own rules are narrow enough):
+ *   With shields down, a connection from the tailnet to the car's Tailscale address is handed to the same port
+ *   on the head unit's 127.0.0.1, so the head unit's own sshd answers (with its own keys: nothing about who may
+ *   log in changes). That would hand over EVERY port on 127.0.0.1 that the tailnet's rules let through, so the
+ *   shields come down only while all of these hold, checked on every poll:
+ *     - SSH was asked for (the file SSH_FILE says "on"; only this helper writes it);
+ *     - the daemon is running and has its rules from Tailscale;
+ *     - every opening those rules make toward the car is port 22 and nothing else (sshOnly below).
+ *   Tailscale's default rules allow everything, so a tailnet that was never set up keeps the shields up and the
+ *   app says why. If the rules widen later, the next poll puts the shields back up.
+ *
  *
  * The socket: /run/woodr-link/link.sock, 0660 root:tm_oap_app (every app has the group), one JSON object per
  * line each way. The helper sends {type:'state',...} on connect, after each request and whenever it changes.
@@ -33,17 +45,20 @@ const http = require('http');
 const net = require('net');
 const path = require('path');
 
-const TS_SOCK = process.env.WOODR_LINK_TS_SOCK || '/run/woodr-link/tailscaled.sock';
+const TS_SOCK = process.env.WOODR_LINK_TS_SOCK || '/run/woodr-link-ts/tailscaled.sock';    /* 0700, the daemon's own user */
 const TS_TCP = process.env.WOODR_LINK_TS_TCP || '';             /* host:port, for tests through a forwarded socket */
 const SOCK = process.env.WOODR_LINK_SOCK || '/run/woodr-link/link.sock';
 const GROUP = process.env.WOODR_LINK_GROUP || 'tm_oap_app';
 const POLL_MS = 2000, IDLE_POLL_MS = 15000;
+const SSH_FILE = process.env.WOODR_LINK_SSH_FILE || '/var/opt/woodr-link/ssh';
+const SSH_PORT = 22;
 
-/** Settings the helper holds the daemon to. Each is [field, wanted value]. */
+/** Settings the helper holds the daemon to. Each is [field, wanted value]. ShieldsUp is true unless SSH is open (shields). */
 const POLICY = Object.freeze([
     ['ShieldsUp', true], ['RouteAll', false], ['CorpDNS', false], ['RunSSH', false],
     ['ExitNodeID', ''], ['AdvertiseRoutes', null],
 ]);
+const wanted = (p, shields) => (p[0] === 'ShieldsUp' ? shields !== false : p[1]);
 
 const log = (s) => { try { process.stdout.write('woodr-link: ' + s + '\n'); } catch (e) { /* no stdout */ } };
 
@@ -74,27 +89,62 @@ function api(method, name, body) {
     });
 }
 
-function offPolicy(prefs) {
+/** the settings that differ from the car policy; shields: false only while SSH is open */
+function offPolicy(prefs, shields) {
     if (!prefs) return [];
     return POLICY.filter((p) => {
         const v = prefs[p[0]];
         if (p[0] === 'AdvertiseRoutes') return Array.isArray(v) && v.length > 0;
         if (p[0] === 'ExitNodeID') return !!v || (!!prefs.ExitNodeIP && prefs.ExitNodeIP !== 'invalid IP');
-        return v !== p[1];
+        return v !== wanted(p, shields);
     }).map((p) => p[0]);
 }
 
-function policyPatch(extra) {
+function policyPatch(extra, shields) {
     const m = { ExitNodeIP: '', ExitNodeIPSet: true };
-    POLICY.forEach((p) => { m[p[0]] = p[1]; m[p[0] + 'Set'] = true; });
+    POLICY.forEach((p) => { m[p[0]] = wanted(p, shields); m[p[0] + 'Set'] = true; });
     Object.keys(extra || {}).forEach((k) => { m[k] = extra[k]; m[k + 'Set'] = true; });
     return m;
+}
+
+/**
+ * Why the tailnet's rules (Tailscale's packet filter for this device, tailcfg.FilterRule[]) are not narrow enough
+ * for SSH: a list of reasons, empty when every opening toward the car is port 22 alone. Rules that only grant
+ * capabilities (no DstPorts) open no port and are left out. Rules that cannot be read count as too wide.
+ */
+function sshOnly(rules) {
+    if (!Array.isArray(rules)) return ['the tailnet\'s access rules could not be read'];
+    const wide = [];
+    let open = 0;
+    rules.forEach((r) => {
+        (r && Array.isArray(r.DstPorts) ? r.DstPorts : []).forEach((d) => {
+            open++;
+            const pr = (d && d.Ports) || {};
+            if (pr.First !== SSH_PORT || pr.Last !== SSH_PORT) {
+                const ports = pr.First === 0 && pr.Last === 65535 ? 'every port' : pr.First === pr.Last ? 'port ' + pr.First : 'ports ' + pr.First + '-' + pr.Last;
+                if (wide.length < 3) wide.push('the access rules open ' + ports + ' to ' + String((d && d.IP) || '?').slice(0, 40));
+            }
+        });
+    });
+    if (!open) return ['the access rules let nothing reach the car (add a rule for port 22)'];
+    return wide;
+}
+
+function sshAsked() {
+    try { return fs.readFileSync(SSH_FILE, 'utf8').trim() === 'on'; } catch (e) { return false; }
+}
+function setSsh(on) {
+    try {
+        if (on) { fs.writeFileSync(SSH_FILE + '.new', 'on\n', { mode: 0o600 }); fs.renameSync(SSH_FILE + '.new', SSH_FILE); }
+        else { try { fs.unlinkSync(SSH_FILE); } catch (e) { if (e.code !== 'ENOENT') throw e; } }
+        return '';
+    } catch (e) { return e.code || e.message; }
 }
 
 /* ---------------- state ---------------- */
 
 const state = { type: 'state', daemon: false, backend: 'unknown', authUrl: '', name: '', tailnet: '', ips: [], online: false,
-    health: [], version: '', policy: 'unknown', note: '' };
+    health: [], version: '', policy: 'unknown', note: '', ssh: 'off', sshWhy: '' };
 const clients = new Set();
 let lastSent = '';
 
@@ -110,6 +160,7 @@ async function poll() {
     if (!st.ok || !st.json) {
         state.daemon = false; state.backend = 'unknown'; state.authUrl = ''; state.online = false; state.ips = [];
         state.note = st.code === 0 ? 'Tailscale is not running (' + st.text + ')' : 'Tailscale answered ' + st.code;
+        state.ssh = sshAsked() ? 'blocked' : 'off'; state.sshWhy = state.ssh === 'blocked' ? 'Tailscale is not running' : '';
         return publish();
     }
     const s = st.json, self = s.Self || {};
@@ -124,12 +175,26 @@ async function poll() {
     state.health = (s.Health || []).slice(0, 3).map((h) => String(h).slice(0, 160));
     if (state.note.indexOf('Tailscale') === 0) state.note = '';
 
+    /* SSH: open only while asked for and the tailnet's rules let nothing but port 22 through (fail closed) */
+    let ssh = 'off', why = '';
+    if (sshAsked()) {
+        if (state.backend !== 'Running') { ssh = 'blocked'; why = 'Tailscale is not connected'; }
+        else {
+            const fr = await api('GET', 'debug-packet-filter-rules');
+            const reasons = sshOnly(fr.ok ? fr.json : null);
+            ssh = reasons.length ? 'blocked' : 'on'; why = reasons[0] || '';
+        }
+    }
+    if (ssh !== state.ssh || why !== state.sshWhy) log('ssh: ' + ssh + (why ? ' (' + why + ')' : ''));
+    state.ssh = ssh; state.sshWhy = why;
+    const shields = ssh !== 'on';
+
     const pr = await api('GET', 'prefs');
     if (pr.ok && pr.json) {
-        const off = offPolicy(pr.json);
+        const off = offPolicy(pr.json, shields);
         if (off.length) {
             log('settings off the car policy (' + off.join(', ') + '): putting them back');
-            const fix = await api('PATCH', 'prefs', policyPatch());
+            const fix = await api('PATCH', 'prefs', policyPatch(null, shields));
             state.policy = fix.ok ? 'enforced' : 'failed';
             if (!fix.ok) state.note = 'Could not restore the car policy (' + (fix.text || fix.code) + ')';
         } else state.policy = 'ok';
@@ -142,7 +207,7 @@ async function poll() {
 const OPS = {
     status: async () => {},
     connect: async () => {
-        const fix = await api('PATCH', 'prefs', policyPatch({ WantRunning: true }));
+        const fix = await api('PATCH', 'prefs', policyPatch({ WantRunning: true }, state.ssh !== 'on'));
         if (!fix.ok) { state.note = 'Tailscale refused the settings (' + (fix.text || fix.code) + ')'; return; }
         const st = await api('GET', 'status');
         const b = st.json && st.json.BackendState;
@@ -152,12 +217,20 @@ const OPS = {
         } else state.note = '';
     },
     disconnect: async () => {
-        const r = await api('PATCH', 'prefs', policyPatch({ WantRunning: false }));
+        const r = await api('PATCH', 'prefs', policyPatch({ WantRunning: false }, true));
         state.note = r.ok ? '' : 'Could not disconnect (' + (r.text || r.code) + ')';
     },
     logout: async () => {
+        await api('PATCH', 'prefs', policyPatch(null, true));
         const r = await api('POST', 'logout');
         state.note = r.ok ? '' : 'Could not log out (' + (r.text || r.code) + ')';
+    },
+    /* asked for or not; whether it opens is poll's decision, from the tailnet's rules */
+    'ssh-on': async () => { const e = setSsh(true); state.note = e ? 'Could not save the SSH setting (' + e + ')' : ''; },
+    'ssh-off': async () => {
+        const e = setSsh(false);
+        await api('PATCH', 'prefs', policyPatch(null, true));
+        state.note = e ? 'Could not save the SSH setting (' + e + ')' : '';
     },
 };
 
@@ -170,7 +243,7 @@ function run(op) {
 /* ---------------- the socket apps use ---------------- */
 
 function serve() {
-    try { fs.mkdirSync(path.dirname(SOCK)); } catch (e) { /* there */ }
+    try { fs.mkdirSync(path.dirname(SOCK), 0o755); } catch (e) { /* there */ }
     try { fs.unlinkSync(SOCK); } catch (e) { /* none */ }
     const server = net.createServer((c) => {
         clients.add(c);
@@ -210,9 +283,10 @@ function serve() {
 
 function loop() {
     chain = chain.then(poll).catch(() => {});
-    const t = setTimeout(loop, clients.size ? POLL_MS : IDLE_POLL_MS);
+    /* quicker while SSH is asked for, so rules that widen close it within seconds */
+    const t = setTimeout(loop, clients.size || sshAsked() ? POLL_MS : IDLE_POLL_MS);
     if (t.unref && process.env.WOODR_LINK_ONCE) t.unref();
 }
 
 if (require.main === module) { serve(); loop(); }
-module.exports = { POLICY: POLICY, offPolicy: offPolicy, policyPatch: policyPatch, OPS: Object.keys(OPS) };
+module.exports = { POLICY: POLICY, offPolicy: offPolicy, policyPatch: policyPatch, sshOnly: sshOnly, OPS: Object.keys(OPS) };
